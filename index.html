@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#e8452c">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -127,7 +128,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 4 · 24/11/2026</p>
+  <p class="note">Intake · versão 5 · 24/11/2026</p>
 </div>
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
@@ -331,11 +332,22 @@ async function analyse(file){
     let models=JSON.parse(localStorage.getItem("cal:gmodels")||"null")||await pickModels();
     const body=JSON.stringify({contents:[{parts:[{text:PROMPT($("hint").value.trim())},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{responseMimeType:"application/json"}});
     let res=null,lastErr="";
-    for(const m of models){
-      const r=await fetch(GB+"models/"+m+":generateContent",{method:"POST",headers:{"x-goog-api-key":GK(),"Content-Type":"application/json"},body});
-      if(r.ok){res=await r.json();localStorage.setItem("cal:gmodel",m);break}
-      lastErr=r.status===429?"Limite gratuito atingido — tenta daqui a um minuto.":r.status===400||r.status===403?"Chave inválida ou sem acesso.":"Erro "+r.status;
-      if(r.status===400||r.status===403)break; // chave errada: não vale a pena tentar outros modelos
+    const wait=ms=>new Promise(r=>setTimeout(r,ms));
+    outer: for(const m of models){
+      for(let t=0;t<2;t++){ // 2 tentativas por modelo
+        btn.textContent=t||m!==models[0]?"A tentar de novo…":"A analisar a foto…";
+        const ac=new AbortController(),to=setTimeout(()=>ac.abort(),30000);
+        let r;
+        try{r=await fetch(GB+"models/"+m+":generateContent",{method:"POST",headers:{"x-goog-api-key":GK(),"Content-Type":"application/json"},body,signal:ac.signal})}
+        catch(e){clearTimeout(to);lastErr=e.name==="AbortError"?"O Gemini demorou demasiado — tenta outra vez.":"Sem ligação à internet.";continue}
+        clearTimeout(to);
+        if(r.ok){res=await r.json();localStorage.setItem("cal:gmodel",m);break outer}
+        if(r.status===400||r.status===403){lastErr="Chave inválida ou sem acesso.";break outer}
+        if(r.status===429){lastErr="Limite gratuito atingido — tenta daqui a um minuto.";break} // passa ao modelo seguinte
+        if(r.status===404){lastErr="Modelo indisponível.";localStorage.removeItem("cal:gmodels");break}
+        lastErr="Servidores do Gemini ocupados — tenta daqui a pouco."; // 500/503
+        await wait(1500);
+      }
     }
     if(!res)throw new Error(lastErr);
     const txt=(res.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/^```(json)?|```$/g,"").trim();
