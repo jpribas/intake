@@ -189,11 +189,12 @@ const CLIENT_ID="339935360215-28kalrkd7kjtv1ms27v9kgq6gt74p52q.apps.googleuserco
 const SCOPE="https://www.googleapis.com/auth/drive.appdata";
 const FILE="intake.json";
 let token=null,tokenExp=0,tc=null,fileId=null,pushT=null,afterToken=null;
+{const t=L.get("gtok");if(t&&t.exp>Date.now()+60000){token=t.t;tokenExp=t.exp}} // sessão guardada (válida ~1 h)
 const connected=()=>localStorage.getItem("cal:gdrive")==="1";
 function setCloud(state,msg){
   $("cloud").className="ib"+(state==="on"?" on":state==="busy"?" busy":"");
   if(msg)$("status").textContent=msg;
-  $("syncbar").hidden=!(connected()&&!token);
+  $("syncbar").hidden=state!=="err";
 }
 function loadGis(){return new Promise((ok,ko)=>{if(window.google&&google.accounts)return ok();
   const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=ok;s.onerror=()=>ko(new Error("gis"));document.head.appendChild(s)})}
@@ -203,13 +204,13 @@ async function getToken(interactive){
   if(!tc)tc=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:r=>{
     const cb=afterToken;afterToken=null;
     if(r.error){cb&&cb.ko(r);return}
-    token=r.access_token;tokenExp=Date.now()+r.expires_in*1000;cb&&cb.ok(token)},
+    token=r.access_token;tokenExp=Date.now()+r.expires_in*1000;L.set("gtok",{t:token,exp:tokenExp});cb&&cb.ok(token)},
     error_callback:e=>{const cb=afterToken;afterToken=null;cb&&cb.ko(e)}});
   return new Promise((ok,ko)=>{afterToken={ok,ko};tc.requestAccessToken({prompt:interactive?"consent":""})});
 }
 async function api(url,opt={}){
   const r=await fetch(url,{...opt,headers:{...(opt.headers||{}),Authorization:"Bearer "+token}});
-  if(r.status===401){token=null;throw new Error("401")}
+  if(r.status===401){token=null;localStorage.removeItem("cal:gtok");throw new Error("401")}
   if(!r.ok)throw new Error("HTTP "+r.status);
   return r;
 }
@@ -246,12 +247,12 @@ async function syncNow(interactive){
     await upload();
     localStorage.setItem("cal:gdrive","1");
     setCloud("on","Sincronizado com o Google Drive · "+new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"}));
-  }catch(e){setCloud("off",e&&e.message==="401"?"Sessão expirou — toca em ☁ para sincronizar.":"Não foi possível sincronizar. Dados guardados neste dispositivo.")}
+  }catch(e){setCloud("err",e&&e.message==="401"?"Sessão expirou — toca em ☁ para sincronizar.":"Não foi possível sincronizar. Dados guardados neste dispositivo.")}
 }
 function schedulePush(){
   if(!token)return;
   clearTimeout(pushT);
-  pushT=setTimeout(async()=>{try{if(Date.now()>tokenExp-60000){setCloud("off");return}if(!fileId)await findFile();await upload();setCloud("on","Sincronizado com o Google Drive · "+new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"}))}catch(e){setCloud("off","Erro ao enviar para o Drive — toca em ☁.")}},1500);
+  pushT=setTimeout(async()=>{try{if(Date.now()>tokenExp-60000){setCloud("off");return}if(!fileId)await findFile();await upload();setCloud("on","Sincronizado com o Google Drive · "+new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"}))}catch(e){setCloud("err","Erro ao enviar para o Drive — toca para tentar de novo.")}},1500);
 }
 function loadDay(){D=L.get("d-"+key(cur))||{entries:[],water:0};render()}
 
@@ -398,11 +399,23 @@ document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.
 document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"))});
 
 S={...DEF,...(L.get("settings")||{})};
-$("status").textContent=connected()?"Toca em ☁ para sincronizar.":"Dados guardados neste dispositivo. Toca em ☁ para ligar ao Google Drive.";
+$("status").textContent=connected()?"":"Dados guardados neste dispositivo. Toca em ☁ para ligar ao Google Drive.";
 loadDay();
 setCloud("off");
 $("cloud").onclick=()=>syncNow(!connected());
 $("syncbar").onclick=()=>syncNow(false);
+/* sincronização automática:
+   - sessão ainda válida → sincroniza logo ao abrir, sem toques
+   - sessão expirada → renova sozinha no primeiro toque (o Google só abre a janela de login a partir de um toque)
+   - ao voltar à app → puxa o que mudou no outro aparelho */
+let syncing=false;
+const autoSync=async inter=>{if(syncing)return;syncing=true;try{await syncNow(inter)}finally{syncing=false}};
+if(connected()){
+  if(token&&Date.now()<tokenExp-60000)autoSync(false);
+  else{$("status").textContent="A sincronização começa no primeiro toque.";
+    document.addEventListener("pointerdown",function once(e){if(e.target.closest("#cloud,#syncbar"))return;document.removeEventListener("pointerdown",once,true);autoSync(false)},true)}
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&token&&Date.now()<tokenExp-60000)autoSync(false)});
+}
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
 </script>
