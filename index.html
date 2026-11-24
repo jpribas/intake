@@ -74,6 +74,10 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 .acts{display:flex;gap:10px;margin-top:14px}
 .acts button{flex:1;min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-weight:600}
 .acts .pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.syncbar{display:block;width:100%;margin-top:12px;min-height:44px;border-radius:14px;border:1px dashed var(--acc);background:transparent;color:var(--acc);font-weight:600}
+.syncbar[hidden]{display:none}
+#cloud.on{color:var(--p);border-color:var(--p)}
+#cloud.busy{opacity:.5}
 @media(prefers-reduced-motion:reduce){.bar i,.plate circle{transition:none!important}}
 @media(max-width:420px){.sum{grid-template-columns:minmax(0,1fr)}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
@@ -85,7 +89,9 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <h1 id="dlabel">Hoje</h1>
     <button class="ib" id="next" aria-label="Dia seguinte">›</button>
     <button class="ib" id="goals" aria-label="Metas">◎</button>
+    <button class="ib" id="cloud" aria-label="Sincronizar com o Google Drive">☁</button>
   </div>
+  <button class="syncbar" id="syncbar" hidden>☁ Toca para sincronizar com o Google Drive</button>
 
   <section class="sum">
     <div class="plate">
@@ -154,7 +160,77 @@ let S={...DEF},D={entries:[],water:0},meal="pa";
 
 /* ---- armazenamento local (localStorage) — sync entre dispositivos fica para depois ---- */
 const L={get(k){try{return JSON.parse(localStorage.getItem("cal:"+k))}catch(e){return null}},set(k,v){try{localStorage.setItem("cal:"+k,JSON.stringify(v))}catch(e){$("status").textContent="Erro ao guardar."}}};
-function save(k,v){L.set(k,v)}
+function save(k,v){v.u=Date.now();L.set(k,v);schedulePush()}
+
+/* ---- sincronização com o Google Drive (pasta escondida da app: appDataFolder) ---- */
+const CLIENT_ID="339935360215-28kalrkd7kjtv1ms27v9kgq6gt74p52q.apps.googleusercontent.com";
+const SCOPE="https://www.googleapis.com/auth/drive.appdata";
+const FILE="intake.json";
+let token=null,tokenExp=0,tc=null,fileId=null,pushT=null,afterToken=null;
+const connected=()=>localStorage.getItem("cal:gdrive")==="1";
+function setCloud(state,msg){
+  $("cloud").className="ib"+(state==="on"?" on":state==="busy"?" busy":"");
+  if(msg)$("status").textContent=msg;
+  $("syncbar").hidden=!(connected()&&!token);
+}
+function loadGis(){return new Promise((ok,ko)=>{if(window.google&&google.accounts)return ok();
+  const s=document.createElement("script");s.src="https://accounts.google.com/gsi/client";s.onload=ok;s.onerror=()=>ko(new Error("gis"));document.head.appendChild(s)})}
+async function getToken(interactive){
+  if(token&&Date.now()<tokenExp-60000)return token;
+  await loadGis();
+  if(!tc)tc=google.accounts.oauth2.initTokenClient({client_id:CLIENT_ID,scope:SCOPE,callback:r=>{
+    const cb=afterToken;afterToken=null;
+    if(r.error){cb&&cb.ko(r);return}
+    token=r.access_token;tokenExp=Date.now()+r.expires_in*1000;cb&&cb.ok(token)},
+    error_callback:e=>{const cb=afterToken;afterToken=null;cb&&cb.ko(e)}});
+  return new Promise((ok,ko)=>{afterToken={ok,ko};tc.requestAccessToken({prompt:interactive?"consent":""})});
+}
+async function api(url,opt={}){
+  const r=await fetch(url,{...opt,headers:{...(opt.headers||{}),Authorization:"Bearer "+token}});
+  if(r.status===401){token=null;throw new Error("401")}
+  if(!r.ok)throw new Error("HTTP "+r.status);
+  return r;
+}
+async function findFile(){
+  const r=await api("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&q="+encodeURIComponent(`name='${FILE}'`));
+  const j=await r.json();fileId=j.files&&j.files[0]?j.files[0].id:null;
+}
+function localAll(){
+  const out={settings:L.get("settings")||null,days:{}};
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("cal:d-"))out.days[k.slice(6)]=L.get(k.slice(4))}
+  return out;
+}
+function merge(remote){ // fica a versão mais recente de cada dia e das metas
+  let changed=false;
+  if(remote.settings&&(!L.get("settings")||(remote.settings.u||0)>(L.get("settings").u||0))){L.set("settings",remote.settings);changed=true}
+  for(const [d,v] of Object.entries(remote.days||{})){const loc=L.get("d-"+d);if(!loc||(v.u||0)>(loc.u||0)){L.set("d-"+d,v);changed=true}}
+  return changed;
+}
+async function upload(){
+  const body=JSON.stringify(localAll());
+  if(fileId){await api(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{method:"PATCH",headers:{"Content-Type":"application/json"},body});return}
+  const meta={name:FILE,parents:["appDataFolder"]},b="intake"+Date.now();
+  const multipart=`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${b}--`;
+  const r=await api("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",{method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body:multipart});
+  fileId=(await r.json()).id;
+}
+async function syncNow(interactive){
+  setCloud("busy","A sincronizar…");
+  try{
+    await getToken(interactive);
+    if(!fileId)await findFile();
+    if(fileId){const r=await api(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+      if(merge(await r.json())){S={...DEF,...(L.get("settings")||{})};loadDay()}}
+    await upload();
+    localStorage.setItem("cal:gdrive","1");
+    setCloud("on","Sincronizado com o Google Drive · "+new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"}));
+  }catch(e){setCloud("off",e&&e.message==="401"?"Sessão expirou — toca em ☁ para sincronizar.":"Não foi possível sincronizar. Dados guardados neste dispositivo.")}
+}
+function schedulePush(){
+  if(!token)return;
+  clearTimeout(pushT);
+  pushT=setTimeout(async()=>{try{if(Date.now()>tokenExp-60000){setCloud("off");return}if(!fileId)await findFile();await upload();setCloud("on","Sincronizado com o Google Drive · "+new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"}))}catch(e){setCloud("off","Erro ao enviar para o Drive — toca em ☁.")}},1500);
+}
 function loadDay(){D=L.get("d-"+key(cur))||{entries:[],water:0};render()}
 
 /* ---- render ---- */
@@ -166,6 +242,7 @@ function render(){
   const T=tot(D.entries),rem=S.kcal-T.k,pct=Math.min(T.k/S.kcal,1);
   $("ring").setAttribute("stroke-dasharray",(pct*326.7).toFixed(1)+" 327");
   $("ring").setAttribute("stroke",rem<0?"#c0392b":"var(--acc)");
+  $("ring").style.opacity=T.k>0?1:0;
   $("rem").textContent=r0(Math.abs(rem));
   $("remlab").textContent=rem<0?"kcal acima da meta":"kcal restantes";
   const bar=(lab,v,g,col)=>`<div class="row"><div class="lab"><span>${lab}</span><span>${r0(v)} / ${g} g</span></div><div class="bar"><i style="width:${Math.min(v/g*100,100)}%;background:${col}"></i></div></div>`;
@@ -223,8 +300,11 @@ document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.
 document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"))});
 
 S={...DEF,...(L.get("settings")||{})};
-$("status").textContent="Dados guardados neste dispositivo.";
+$("status").textContent=connected()?"Toca em ☁ para sincronizar.":"Dados guardados neste dispositivo. Toca em ☁ para ligar ao Google Drive.";
 loadDay();
+setCloud("off");
+$("cloud").onclick=()=>syncNow(!connected());
+$("syncbar").onclick=()=>syncNow(false);
 if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
 </script>
