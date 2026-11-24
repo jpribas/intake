@@ -1,5 +1,5 @@
 // Service worker: guarda a app em cache para abrir mesmo sem internet
-const CACHE = "intake-v6";
+const CACHE = "intake-v7";
 const FILES = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {

@@ -84,6 +84,14 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 .air{display:grid;grid-template-columns:auto minmax(0,1fr) 84px auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .air input[type=checkbox]{width:22px;height:22px;min-height:0;accent-color:var(--acc)}
 .air input[type=number]{padding:8px;min-height:40px;text-align:right}
+.sizes{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--mute)}
+.sz{min-height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:var(--bg)}
+.sz.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.cf{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;margin-left:6px;vertical-align:2px}
+.cf.alta{background:color-mix(in srgb,var(--p) 22%,transparent);color:var(--p)}
+.cf.media{background:color-mix(in srgb,#d89b18 22%,transparent);color:#d89b18}
+.cf.baixa{background:color-mix(in srgb,var(--acc) 22%,transparent);color:var(--acc)}
+.air.low{background:color-mix(in srgb,var(--acc) 7%,transparent);border-radius:10px}
 .air .nm{font-weight:500}.air .nm small{display:block;color:var(--mute);font-weight:400;font-size:12px}
 .air .kk{font-family:Outfit;font-weight:600;white-space:nowrap;min-width:52px;text-align:right}
 .aitot{display:flex;justify-content:space-between;font-size:14px;color:var(--mute);padding-top:6px;border-top:1px solid var(--line)}
@@ -128,7 +136,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 6 · 24/11/2026</p>
+  <p class="note">Intake · versão 7 · 24/11/2026</p>
 </div>
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
@@ -136,6 +144,12 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div class="photo">
     <button class="photobtn" id="photoBtn">📷 Calcular por foto</button>
     <input id="photoIn" type="file" accept="image/*" hidden>
+    <div class="sizes" role="group" aria-label="Tamanho do prato">
+      <span>Prato:</span>
+      <button class="sz" data-sz="pequeno">Pequeno</button>
+      <button class="sz on" data-sz="médio">Médio</button>
+      <button class="sz" data-sz="grande">Grande</button>
+    </div>
     <input id="hint" placeholder="Pista opcional: ex. prato com 200 g de arroz" autocomplete="off">
     <div id="aiOut"></div>
   </div>
@@ -317,12 +331,18 @@ function imgToB64(file){return new Promise((ok,ko)=>{const img=new Image(),u=URL
     c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
     URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",0.82).split(",")[1])};
   img.onerror=()=>ko(new Error("Não foi possível ler a imagem."));img.src=u})}
-const PROMPT=hint=>`És um nutricionista. Identifica cada alimento visível nesta foto de uma refeição e estima a quantidade em gramas (ou ml para bebidas) pelo tamanho do prato, talheres e porções.
-Para cada alimento dá os valores nutricionais POR 100 g, usando valores típicos de tabelas de composição de alimentos (preferir a tabela portuguesa INSA quando aplicável), considerando o alimento já cozinhado como aparece na foto.
-Nomes em português de Portugal, curtos (ex.: "Arroz branco cozido", "Peito de frango grelhado").
-${hint?`Informação dada pelo utilizador (usa-a com prioridade): "${hint}".`:""}
-Responde APENAS com JSON neste formato, sem texto extra:
-{"items":[{"name":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0}]}
+let SIZE="médio";
+const PROMPT=hint=>`És um nutricionista experiente a analisar a foto de uma refeição para um diário alimentar.
+
+1. PRODUTOS DE MARCA: se reconheceres um produto de marca ou de cadeia de restaurantes (ex.: Big Mac, McChicken, batatas fritas McDonald's, Whopper, pastel de nata, Compal, Coca-Cola, iogurte Danone), usa o nome comercial e os valores nutricionais OFICIAIS da versão europeia/portuguesa, como um só item (não separes pão, carne, molho…).
+2. NÃO DEIXES NADA DE FORA: inclui todos os alimentos visíveis, mesmo pequenos (enchidos, sementes, frutos secos, queijo ralado), molhos e temperos visíveis, e o óleo/azeite usado a cozinhar quando a comida é frita, salteada ou brilhante (estima-o como item à parte, ex.: "Azeite (cozinhado)").
+3. QUANTIDADES: estima as gramas (ou ml) pelo tamanho do prato, talheres e porções. O utilizador diz que o prato é ${SIZE}. Na dúvida, prefere porções normais de restaurante — não subestimes. Conta as peças quando der (fatias, pedaços) e multiplica pelo peso típico de cada uma.
+4. VALORES: dá kcal, proteína, hidratos e gordura POR 100 g, com valores de tabelas de composição (preferir a tabela portuguesa INSA), para o alimento já cozinhado como aparece.
+5. CONFIANÇA: para cada item indica "alta", "media" ou "baixa" — baixa quando não tens a certeza do que é ou da quantidade.
+${hint?`6. Informação do utilizador (tem prioridade sobre o que vês): "${hint}".`:""}
+
+Nomes em português de Portugal, curtos. Responde APENAS com JSON, sem texto extra:
+{"items":[{"name":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0,"conf":"alta"}]}
 Se não houver comida na foto responde {"items":[]}.`;
 async function analyse(file){
   if(!GK()){$("aiOut").innerHTML=`<p class="small">Primeiro cola a tua chave Gemini em ◎ Metas.</p>`;return}
@@ -353,16 +373,16 @@ async function analyse(file){
     }
     if(!res)throw new Error(lastErr);
     const txt=(res.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/^```(json)?|```$/g,"").trim();
-    const items=(JSON.parse(txt).items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,on:true}));
+    const items=(JSON.parse(txt).items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,cf:["alta","media","baixa"].includes(String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""))?String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""):"media",on:true}));
     AI=items;renderAI();
   }catch(e){$("aiOut").innerHTML=`<p class="small">${esc(e.message||"Erro a analisar.")}</p>`}
   btn.disabled=false;btn.textContent="📷 Calcular por foto";
 }
 function renderAI(){
   if(!AI.length){$("aiOut").innerHTML=`<p class="small">Não encontrei comida na foto. Tenta outra ou adiciona à mão.</p>`;return}
-  $("aiOut").innerHTML=`<div class="ai"><p class="small">Confirma as quantidades (a IA erra mais nas gramas):</p>`+AI.map((x,i)=>`<div class="air">
+  $("aiOut").innerHTML=`<div class="ai"><p class="small">Confirma as quantidades (a IA erra mais nas gramas):</p>`+AI.map((x,i)=>`<div class="air${x.cf==="baixa"?" low":""}">
     <input type="checkbox" data-ai-on="${i}" ${x.on?"checked":""} aria-label="Incluir ${esc(x.n)}">
-    <div class="nm">${esc(x.n)}<small>${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
+    <div class="nm">${esc(x.n)}<span class="cf ${x.cf}">${x.cf==="alta"?"certeza alta":x.cf==="baixa"?"verifica":"média"}</span><small>${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
     <input type="number" inputmode="decimal" data-ai-g="${i}" value="${r0(x.g)}" aria-label="Gramas de ${esc(x.n)}">
     <span class="kk" id="aik${i}">${r0(x.k*x.g/100)}</span></div>`).join("")+
     `<div class="aitot" id="aitot"></div><div class="acts"><button class="pri" id="aiAdd">Adicionar selecionados</button></div></div>`;
@@ -379,6 +399,7 @@ function aiAdd(){
   $("ovAdd").classList.remove("on");render();
 }
 $("photoBtn").onclick=()=>$("photoIn").click();
+document.querySelectorAll(".sz").forEach(b=>b.onclick=()=>{SIZE=b.dataset.sz;document.querySelectorAll(".sz").forEach(x=>x.classList.toggle("on",x===b))});
 $("photoIn").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)analyse(f)};
 $("aiOut").addEventListener("input",e=>{const i=e.target.dataset.aiG;if(i!==undefined){AI[i].g=+e.target.value||0;$("aik"+i).textContent=r0(AI[i].k*AI[i].g/100);aiTot()}});
 $("aiOut").addEventListener("change",e=>{const i=e.target.dataset.aiOn;if(i!==undefined){AI[i].on=e.target.checked;aiTot()}});
