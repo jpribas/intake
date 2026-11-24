@@ -74,6 +74,19 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 .acts{display:flex;gap:10px;margin-top:14px}
 .acts button{flex:1;min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-weight:600}
 .acts .pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.photo{border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:6px;display:grid;gap:8px}
+.photobtn{min-height:52px;border-radius:14px;border:0;background:var(--acc);color:#fff;font-weight:600;font-size:17px}
+.photobtn:disabled{opacity:.6}
+.small{font-size:13px;color:var(--mute);margin:6px 0 0}
+.small a{color:var(--acc)}
+.ai{display:grid;gap:6px}
+.air{display:grid;grid-template-columns:auto minmax(0,1fr) 84px auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.air input[type=checkbox]{width:22px;height:22px;min-height:0;accent-color:var(--acc)}
+.air input[type=number]{padding:8px;min-height:40px;text-align:right}
+.air .nm{font-weight:500}.air .nm small{display:block;color:var(--mute);font-weight:400;font-size:12px}
+.air .kk{font-family:Outfit;font-weight:600;white-space:nowrap;min-width:52px;text-align:right}
+.aitot{display:flex;justify-content:space-between;font-size:14px;color:var(--mute);padding-top:6px;border-top:1px solid var(--line)}
+.aitot b{color:var(--ink)}
 .syncbar{display:block;width:100%;margin-top:12px;min-height:44px;border-radius:14px;border:1px dashed var(--acc);background:transparent;color:var(--acc);font-weight:600}
 .syncbar[hidden]{display:none}
 #cloud.on{color:var(--p);border-color:var(--p)}
@@ -118,6 +131,12 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
   <h2 id="addT">Adicionar</h2>
+  <div class="photo">
+    <button class="photobtn" id="photoBtn">📷 Calcular por foto</button>
+    <input id="photoIn" type="file" accept="image/*" hidden>
+    <input id="hint" placeholder="Pista opcional: ex. prato com 200 g de arroz" autocomplete="off">
+    <div id="aiOut"></div>
+  </div>
   <label for="q">Procurar alimento</label>
   <input id="q" placeholder="ex.: arroz, frango, ovo" autocomplete="off">
   <div class="res" id="res"></div>
@@ -143,6 +162,9 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <div><label for="gf">Gordura (g)</label><input id="gf" type="number" inputmode="numeric"></div>
   </div>
   <label for="gw">Água (ml)</label><input id="gw" type="number" inputmode="numeric">
+  <label for="gkey">Chave da API Gemini (só fica neste aparelho)</label>
+  <input id="gkey" type="password" autocomplete="off" placeholder="Cola aqui a chave do Google AI Studio">
+  <p class="small">Cria a chave em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. <span id="gmodel"></span></p>
   <div class="acts"><button id="gX">Cancelar</button><button class="pri" id="gOk">Guardar</button></div>
 </div></div>
 
@@ -270,7 +292,81 @@ function pick(f){$("fn").value=f.n;F[0].value=f.k;F[1].value=f.p;F[2].value=f.c;
 function calc(){const g=+$("fg").value||0,m=g/100;const [k,p,c,f]=F.map(x=>+x.value||0);return {g,kcal:k*m,p:p*m,c:c*m,f:f*m,per:{k,p,c,f}}}
 function preview(){const v=calc();$("pv").innerHTML=`<span><b>${r0(v.kcal)}</b>kcal</span><span><b>${r1(v.p)}</b>P</span><span><b>${r1(v.c)}</b>H</span><span><b>${r1(v.f)}</b>G</span>`}
 function openAdd(m){meal=m;$("addT").textContent="Adicionar · "+MEALS.find(x=>x[0]===m)[1];
-  $("q").value="";$("fn").value="";$("fg").value=100;F.forEach(x=>x.value="");search();preview();$("ovAdd").classList.add("on");$("q").focus()}
+  $("q").value="";$("fn").value="";$("fg").value=100;F.forEach(x=>x.value="");$("hint").value="";$("aiOut").innerHTML="";AI=[];search();preview();$("ovAdd").classList.add("on")}
+
+/* ---- foto com IA (Gemini) ---- */
+const GK=()=>localStorage.getItem("cal:gkey")||"";
+const GB="https://generativelanguage.googleapis.com/v1beta/";
+let AI=[];
+async function pickModels(){ // escolhe automaticamente os modelos "flash" disponíveis na tua chave
+  const r=await fetch(GB+"models?pageSize=1000",{headers:{"x-goog-api-key":GK()}});
+  if(!r.ok)throw new Error(r.status===400||r.status===403?"Chave inválida.":"Erro "+r.status);
+  const j=await r.json();
+  const ver=n=>(n.match(/(\d+(?:\.\d+)?)/)||[0,0])[1]*1;
+  const ok=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes("generateContent")).map(m=>m.name.replace("models/",""))
+    .filter(n=>/flash/.test(n)&&!/(image|tts|live|audio|embed|exp|preview|thinking|8b|native)/.test(n)&&!/-\d{3}$/.test(n));
+  ok.sort((a,b)=>ver(b)-ver(a)||(/lite/.test(a)?1:0)-(/lite/.test(b)?1:0));
+  if(!ok.length)throw new Error("Nenhum modelo disponível nesta chave.");
+  localStorage.setItem("cal:gmodels",JSON.stringify(ok));return ok;
+}
+function imgToB64(file){return new Promise((ok,ko)=>{const img=new Image(),u=URL.createObjectURL(file);
+  img.onload=()=>{const M=1024,s=Math.min(1,M/Math.max(img.width,img.height)),c=document.createElement("canvas");
+    c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",0.82).split(",")[1])};
+  img.onerror=()=>ko(new Error("Não foi possível ler a imagem."));img.src=u})}
+const PROMPT=hint=>`És um nutricionista. Identifica cada alimento visível nesta foto de uma refeição e estima a quantidade em gramas (ou ml para bebidas) pelo tamanho do prato, talheres e porções.
+Para cada alimento dá os valores nutricionais POR 100 g, usando valores típicos de tabelas de composição de alimentos (preferir a tabela portuguesa INSA quando aplicável), considerando o alimento já cozinhado como aparece na foto.
+Nomes em português de Portugal, curtos (ex.: "Arroz branco cozido", "Peito de frango grelhado").
+${hint?`Informação dada pelo utilizador (usa-a com prioridade): "${hint}".`:""}
+Responde APENAS com JSON neste formato, sem texto extra:
+{"items":[{"name":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0}]}
+Se não houver comida na foto responde {"items":[]}.`;
+async function analyse(file){
+  if(!GK()){$("aiOut").innerHTML=`<p class="small">Primeiro cola a tua chave Gemini em ◎ Metas.</p>`;return}
+  const btn=$("photoBtn");btn.disabled=true;btn.textContent="A analisar a foto…";$("aiOut").innerHTML="";
+  try{
+    const b64=await imgToB64(file);
+    let models=JSON.parse(localStorage.getItem("cal:gmodels")||"null")||await pickModels();
+    const body=JSON.stringify({contents:[{parts:[{text:PROMPT($("hint").value.trim())},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{responseMimeType:"application/json"}});
+    let res=null,lastErr="";
+    for(const m of models){
+      const r=await fetch(GB+"models/"+m+":generateContent",{method:"POST",headers:{"x-goog-api-key":GK(),"Content-Type":"application/json"},body});
+      if(r.ok){res=await r.json();localStorage.setItem("cal:gmodel",m);break}
+      lastErr=r.status===429?"Limite gratuito atingido — tenta daqui a um minuto.":r.status===400||r.status===403?"Chave inválida ou sem acesso.":"Erro "+r.status;
+      if(r.status===400||r.status===403)break; // chave errada: não vale a pena tentar outros modelos
+    }
+    if(!res)throw new Error(lastErr);
+    const txt=(res.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/^```(json)?|```$/g,"").trim();
+    const items=(JSON.parse(txt).items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,on:true}));
+    AI=items;renderAI();
+  }catch(e){$("aiOut").innerHTML=`<p class="small">${esc(e.message||"Erro a analisar.")}</p>`}
+  btn.disabled=false;btn.textContent="📷 Calcular por foto";
+}
+function renderAI(){
+  if(!AI.length){$("aiOut").innerHTML=`<p class="small">Não encontrei comida na foto. Tenta outra ou adiciona à mão.</p>`;return}
+  $("aiOut").innerHTML=`<div class="ai"><p class="small">Confirma as quantidades (a IA erra mais nas gramas):</p>`+AI.map((x,i)=>`<div class="air">
+    <input type="checkbox" data-ai-on="${i}" ${x.on?"checked":""} aria-label="Incluir ${esc(x.n)}">
+    <div class="nm">${esc(x.n)}<small>${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
+    <input type="number" inputmode="decimal" data-ai-g="${i}" value="${r0(x.g)}" aria-label="Gramas de ${esc(x.n)}">
+    <span class="kk" id="aik${i}">${r0(x.k*x.g/100)}</span></div>`).join("")+
+    `<div class="aitot" id="aitot"></div><div class="acts"><button class="pri" id="aiAdd">Adicionar selecionados</button></div></div>`;
+  aiTot();
+}
+function aiTot(){const t=AI.filter(x=>x.on).reduce((a,x)=>({k:a.k+x.k*x.g/100,p:a.p+x.p*x.g/100,c:a.c+x.c*x.g/100,f:a.f+x.f*x.g/100}),{k:0,p:0,c:0,f:0});
+  const el=$("aitot");if(el)el.innerHTML=`<span>Total <b>${r0(t.k)} kcal</b></span><span>P <b>${r1(t.p)}</b> · H <b>${r1(t.c)}</b> · G <b>${r1(t.f)}</b></span>`}
+function aiAdd(){
+  const sel=AI.filter(x=>x.on&&x.g>0);if(!sel.length)return;
+  for(const x of sel){const m=x.g/100;
+    D.entries.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),meal,name:x.n,g:x.g,kcal:r1(x.k*m),p:r1(x.p*m),c:r1(x.c*m),f:r1(x.f*m)});
+    S.foods=[{n:x.n,k:x.k,p:x.p,c:x.c,f:x.f},...S.foods.filter(f=>f.n.toLowerCase()!==x.n.toLowerCase())].slice(0,150);}
+  save("d-"+key(cur),D);save("settings",S);
+  $("ovAdd").classList.remove("on");render();
+}
+$("photoBtn").onclick=()=>$("photoIn").click();
+$("photoIn").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)analyse(f)};
+$("aiOut").addEventListener("input",e=>{const i=e.target.dataset.aiG;if(i!==undefined){AI[i].g=+e.target.value||0;$("aik"+i).textContent=r0(AI[i].k*AI[i].g/100);aiTot()}});
+$("aiOut").addEventListener("change",e=>{const i=e.target.dataset.aiOn;if(i!==undefined){AI[i].on=e.target.checked;aiTot()}});
+$("aiOut").addEventListener("click",e=>{if(e.target.id==="aiAdd")aiAdd()});
 function addOk(){
   const name=$("fn").value.trim(),v=calc();
   if(!name||!v.g){$("fn").focus();return}
@@ -293,9 +389,11 @@ $("q").oninput=search;
 $("res").onclick=e=>{const b=e.target.closest("[data-i]");if(b)pick($("res")._list[+b.dataset.i])};
 [$("fg"),...F].forEach(x=>x.oninput=preview);
 $("addOk").onclick=addOk;$("addX").onclick=()=>$("ovAdd").classList.remove("on");
-$("goals").onclick=()=>{$("gk").value=S.kcal;$("gp").value=S.p;$("gc").value=S.c;$("gf").value=S.f;$("gw").value=S.water;$("ovGoal").classList.add("on")};
+$("goals").onclick=()=>{$("gk").value=S.kcal;$("gp").value=S.p;$("gc").value=S.c;$("gf").value=S.f;$("gw").value=S.water;$("gkey").value=GK();
+  const m=localStorage.getItem("cal:gmodel");$("gmodel").textContent=m?"Modelo: "+m:"";$("ovGoal").classList.add("on")};
 $("gX").onclick=()=>$("ovGoal").classList.remove("on");
-$("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p=n("gp");S.c=n("gc");S.f=n("gf");S.water=n("gw");save("settings",S);$("ovGoal").classList.remove("on");render()};
+$("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p=n("gp");S.c=n("gc");S.f=n("gf");S.water=n("gw");save("settings",S);
+  const k=$("gkey").value.trim();if(k!==GK()){localStorage.setItem("cal:gkey",k);localStorage.removeItem("cal:gmodels");localStorage.removeItem("cal:gmodel")}$("ovGoal").classList.remove("on");render()};
 document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("on")}));
 document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"))});
 
