@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intake</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e8452c">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: calm, practical kitchen notebook — quick to log, nothing in the way.
+   IDEA: a plate seen from above: the ring is the plate, filled as you eat.
+   PICTURE: the big plate ring with remaining kcal, macro bars beside it.
+   COLOUR and TYPE: tomato red accent on warm paper / charcoal at night; Outfit + Inter.
+   LAYOUT: one column, sticky date bar, summary first, meals as cards, sheet for adding. */
+:root{color-scheme:light dark;
+--bg:light-dark(#f5f1ea,#14161a);--card:light-dark(#fffdf9,#1e2127);--line:light-dark(#e6dfd3,#2c3038);
+--ink:light-dark(#1d1b18,#f1eee8);--mute:light-dark(#6f685e,#9a978f);
+--acc:#e8452c;--p:#2f9e6e;--c:#2b8fd6;--f:#a05cd6;--w:#3aa8c9}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,.num{font-family:Outfit,Inter,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px 96px}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
+.top h1{flex:1;text-align:center;font-size:22px;margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+.ib{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:20px}
+.ib:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.sum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:16px}
+.plate{position:relative;aspect-ratio:1;max-width:220px;width:100%;justify-self:center}
+.plate svg{width:100%;height:100%;transform:rotate(-90deg)}
+.plate .ctr{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.plate .big{font-size:clamp(30px,8vw,42px);font-weight:700;line-height:1}
+.plate small{color:var(--mute);font-size:13px}
+.mac{display:grid;gap:12px}
+.mac .row{display:grid;gap:4px}
+.mac .lab{display:flex;justify-content:space-between;font-size:14px}
+.mac .lab span:last-child{color:var(--mute);white-space:nowrap}
+.bar{height:8px;border-radius:8px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:8px;transition:width .4s}
+.kc{display:flex;justify-content:space-between;font-size:14px;color:var(--mute);border-top:1px solid var(--line);padding-top:10px}
+.kc b{color:var(--ink);font-family:Outfit}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;margin-top:12px;overflow:hidden}
+.ch{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px}
+.ch h2{font-size:19px;margin:0;flex:1}
+.ch .k{color:var(--mute);font-size:14px;white-space:nowrap}
+.add{width:44px;height:44px;border-radius:50%;border:0;background:var(--acc);color:#fff;font-size:24px;line-height:1}
+.it{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px;border-top:1px solid var(--line)}
+.it .n{flex:1}
+.it .n div:first-child{font-weight:500}
+.it .n div:last-child{color:var(--mute);font-size:13px}
+.it .kk{font-family:Outfit;font-weight:600;white-space:nowrap}
+.del{width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--mute);font-size:18px}
+.water .cups{display:flex;gap:8px;padding:0 16px 14px;flex-wrap:wrap}
+.chip{min-height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:var(--bg)}
+.note{color:var(--mute);font-size:13px;text-align:center;margin:18px 0 0}
+.ov{position:fixed;inset:0;background:rgb(0 0 0/.45);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.ov.on{display:flex}
+.sh{background:var(--card);width:100%;max-width:640px;max-height:92vh;overflow:auto;border-radius:22px 22px 0 0;padding:18px 16px 24px}
+.sh h2{margin:0 0 12px;font-size:22px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px 12px;min-height:44px}
+.g2{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.res{max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:8px}
+.res button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;padding:11px 12px;border:0;border-bottom:1px solid var(--line);background:transparent;min-height:44px}
+.res button span:last-child{color:var(--mute);font-size:13px;white-space:nowrap}
+.prev{display:flex;justify-content:space-around;margin:14px 0;font-size:14px;color:var(--mute);text-align:center}
+.prev b{display:block;color:var(--ink);font-family:Outfit;font-size:20px}
+.acts{display:flex;gap:10px;margin-top:14px}
+.acts button{flex:1;min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-weight:600}
+.acts .pri{background:var(--acc);border-color:var(--acc);color:#fff}
+@media(prefers-reduced-motion:reduce){.bar i,.plate circle{transition:none!important}}
+@media(max-width:420px){.sum{grid-template-columns:minmax(0,1fr)}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <button class="ib" id="prev" aria-label="Dia anterior">‹</button>
+    <h1 id="dlabel">Hoje</h1>
+    <button class="ib" id="next" aria-label="Dia seguinte">›</button>
+    <button class="ib" id="goals" aria-label="Metas">◎</button>
+  </div>
+
+  <section class="sum">
+    <div class="plate">
+      <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--line)" stroke-width="12"/><circle id="ring" cx="60" cy="60" r="52" fill="none" stroke="var(--acc)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 327" style="transition:stroke-dasharray .5s"/></svg>
+      <div class="ctr"><span class="big num" id="rem">0</span><small id="remlab">kcal restantes</small></div>
+    </div>
+    <div class="mac" id="mac"></div>
+  </section>
+
+  <div class="card water">
+    <div class="ch"><h2>Água</h2><span class="k" id="wk">0 / 2000 ml</span></div>
+    <div class="bar" style="margin:0 16px 12px"><i id="wbar" style="background:var(--w);width:0"></i></div>
+    <div class="cups">
+      <button class="chip" data-w="250">+250 ml</button>
+      <button class="chip" data-w="500">+500 ml</button>
+      <button class="chip" data-w="-250">−250 ml</button>
+    </div>
+  </div>
+
+  <div id="meals"></div>
+  <p class="note" id="status">A carregar…</p>
+  <p class="note">Valores da lista base são aproximados (por 100 g).</p>
+</div>
+
+<div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
+  <h2 id="addT">Adicionar</h2>
+  <label for="q">Procurar alimento</label>
+  <input id="q" placeholder="ex.: arroz, frango, ovo" autocomplete="off">
+  <div class="res" id="res"></div>
+  <label for="fn">Nome</label><input id="fn">
+  <label for="fg">Quantidade (g)</label><input id="fg" type="number" inputmode="decimal" value="100">
+  <label>Por 100 g: kcal · proteína · hidratos · gordura</label>
+  <div class="g2">
+    <input id="fk" type="number" inputmode="decimal" aria-label="kcal por 100 g" placeholder="kcal">
+    <input id="fp" type="number" inputmode="decimal" aria-label="Proteína por 100 g" placeholder="P">
+    <input id="fc" type="number" inputmode="decimal" aria-label="Hidratos por 100 g" placeholder="H">
+    <input id="ff" type="number" inputmode="decimal" aria-label="Gordura por 100 g" placeholder="G">
+  </div>
+  <div class="prev" id="pv"></div>
+  <div class="acts"><button id="addX">Cancelar</button><button class="pri" id="addOk">Adicionar</button></div>
+</div></div>
+
+<div class="ov" id="ovGoal"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="gT">
+  <h2 id="gT">Metas diárias</h2>
+  <label for="gk">Calorias (kcal)</label><input id="gk" type="number" inputmode="numeric">
+  <div class="g2" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+    <div><label for="gp">Proteína (g)</label><input id="gp" type="number" inputmode="numeric"></div>
+    <div><label for="gc">Hidratos (g)</label><input id="gc" type="number" inputmode="numeric"></div>
+    <div><label for="gf">Gordura (g)</label><input id="gf" type="number" inputmode="numeric"></div>
+  </div>
+  <label for="gw">Água (ml)</label><input id="gw" type="number" inputmode="numeric">
+  <div class="acts"><button id="gX">Cancelar</button><button class="pri" id="gOk">Guardar</button></div>
+</div></div>
+
+<script>
+{
+const BASE=[["Arroz branco cozido",130,2.7,28,0.3],["Massa cozida",158,5.8,31,0.9],["Batata cozida",87,1.9,20,0.1],["Batata-doce cozida",86,1.6,20,0.1],["Pão de mistura",250,9,48,2.5],["Aveia em flocos",389,16.9,66,6.9],["Peito de frango grelhado",165,31,0,3.6],["Peito de peru",135,29,0,1.5],["Carne de vaca magra",187,26,0,9],["Salmão",208,20,0,13],["Pescada cozida",85,18,0,1],["Atum ao natural (lata)",116,26,0,1],["Ovo inteiro",143,12.6,0.7,9.5],["Claras de ovo",52,11,0.7,0.2],["Leite meio-gordo",47,3.3,4.8,1.6],["Iogurte grego natural",97,9,4,5],["Queijo flamengo",350,26,0,27],["Fiambre de peru",105,18,2,2.5],["Whey protein",400,80,8,6],["Feijão cozido",127,8.7,22.8,0.5],["Grão-de-bico cozido",164,8.9,27,2.6],["Brócolos",35,2.4,7,0.4],["Alface",15,1.4,2.9,0.2],["Tomate",18,0.9,3.9,0.2],["Banana",89,1.1,23,0.3],["Maçã",52,0.3,14,0.2],["Laranja",47,0.9,12,0.1],["Azeite",884,0,0,100],["Manteiga de amendoim",588,25,20,50],["Amêndoas",579,21,22,50],["Chocolate negro 70%",598,7.8,46,43]].map(([n,k,p,c,f])=>({n,k,p,c,f}));
+const MEALS=[["pa","Pequeno-almoço"],["al","Almoço"],["la","Lanche"],["ja","Jantar"]];
+const DEF={kcal:2300,p:150,c:250,f:75,water:2000,foods:[]};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const r0=n=>Math.round(n),r1=n=>Math.round(n*10)/10;
+const key=d=>d.toISOString().slice(0,10);
+let cur=new Date();cur.setHours(12,0,0,0);
+let S={...DEF},D={entries:[],water:0},meal="pa";
+
+/* ---- armazenamento local (localStorage) — sync entre dispositivos fica para depois ---- */
+const L={get(k){try{return JSON.parse(localStorage.getItem("cal:"+k))}catch(e){return null}},set(k,v){try{localStorage.setItem("cal:"+k,JSON.stringify(v))}catch(e){$("status").textContent="Erro ao guardar."}}};
+function save(k,v){L.set(k,v)}
+function loadDay(){D=L.get("d-"+key(cur))||{entries:[],water:0};render()}
+
+/* ---- render ---- */
+function tot(list){return list.reduce((a,e)=>({k:a.k+e.kcal,p:a.p+e.p,c:a.c+e.c,f:a.f+e.f}),{k:0,p:0,c:0,f:0})}
+function dayLabel(){const t=new Date();t.setHours(12,0,0,0);const diff=Math.round((cur-t)/864e5);
+  return diff===0?"Hoje":diff===-1?"Ontem":diff===1?"Amanhã":cur.toLocaleDateString("pt-PT",{weekday:"short",day:"numeric",month:"short"})}
+function render(){
+  $("dlabel").textContent=dayLabel();
+  const T=tot(D.entries),rem=S.kcal-T.k,pct=Math.min(T.k/S.kcal,1);
+  $("ring").setAttribute("stroke-dasharray",(pct*326.7).toFixed(1)+" 327");
+  $("ring").setAttribute("stroke",rem<0?"#c0392b":"var(--acc)");
+  $("rem").textContent=r0(Math.abs(rem));
+  $("remlab").textContent=rem<0?"kcal acima da meta":"kcal restantes";
+  const bar=(lab,v,g,col)=>`<div class="row"><div class="lab"><span>${lab}</span><span>${r0(v)} / ${g} g</span></div><div class="bar"><i style="width:${Math.min(v/g*100,100)}%;background:${col}"></i></div></div>`;
+  $("mac").innerHTML=bar("Proteína",T.p,S.p,"var(--p)")+bar("Hidratos",T.c,S.c,"var(--c)")+bar("Gordura",T.f,S.f,"var(--f)")+
+    `<div class="kc"><span>Comido <b>${r0(T.k)}</b></span><span>Meta <b>${S.kcal}</b></span></div>`;
+  $("wk").textContent=`${D.water} / ${S.water} ml`;
+  $("wbar").style.width=Math.min(D.water/S.water*100,100)+"%";
+  $("meals").innerHTML=MEALS.map(([id,name])=>{
+    const L2=D.entries.filter(e=>e.meal===id),t=tot(L2);
+    return `<div class="card"><div class="ch"><h2>${name}</h2><span class="k">${r0(t.k)} kcal</span><button class="add" data-add="${id}" aria-label="Adicionar a ${name}">+</button></div>`+
+      L2.map(e=>`<div class="it"><div class="n"><div>${esc(e.name)}</div><div>${r0(e.g)} g · P ${r1(e.p)} · H ${r1(e.c)} · G ${r1(e.f)}</div></div><span class="kk">${r0(e.kcal)}</span><button class="del" data-del="${esc(e.id)}" aria-label="Apagar">✕</button></div>`).join("")+`</div>`;
+  }).join("");
+}
+
+/* ---- adicionar alimento ---- */
+const F=["fk","fp","fc","ff"].map($);
+function allFoods(){const seen=new Set(S.foods.map(f=>f.n.toLowerCase()));return [...S.foods,...BASE.filter(b=>!seen.has(b.n.toLowerCase()))]}
+function search(){
+  const t=$("q").value.trim().toLowerCase();
+  const list=allFoods().filter(f=>!t||f.n.toLowerCase().includes(t)).slice(0,30);
+  $("res").innerHTML=list.length?list.map((f,i)=>`<button data-i="${i}"><span>${esc(f.n)}</span><span>${r0(f.k)} kcal/100g</span></button>`).join(""):`<button disabled><span>Sem resultados — preenche em baixo</span><span></span></button>`;
+  $("res")._list=list;
+}
+function pick(f){$("fn").value=f.n;F[0].value=f.k;F[1].value=f.p;F[2].value=f.c;F[3].value=f.f;$("fg").focus();preview()}
+function calc(){const g=+$("fg").value||0,m=g/100;const [k,p,c,f]=F.map(x=>+x.value||0);return {g,kcal:k*m,p:p*m,c:c*m,f:f*m,per:{k,p,c,f}}}
+function preview(){const v=calc();$("pv").innerHTML=`<span><b>${r0(v.kcal)}</b>kcal</span><span><b>${r1(v.p)}</b>P</span><span><b>${r1(v.c)}</b>H</span><span><b>${r1(v.f)}</b>G</span>`}
+function openAdd(m){meal=m;$("addT").textContent="Adicionar · "+MEALS.find(x=>x[0]===m)[1];
+  $("q").value="";$("fn").value="";$("fg").value=100;F.forEach(x=>x.value="");search();preview();$("ovAdd").classList.add("on");$("q").focus()}
+function addOk(){
+  const name=$("fn").value.trim(),v=calc();
+  if(!name||!v.g){$("fn").focus();return}
+  D.entries.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),meal,name,g:v.g,kcal:r1(v.kcal),p:r1(v.p),c:r1(v.c),f:r1(v.f)});
+  save("d-"+key(cur),D);
+  const nf={n:name,...v.per};S.foods=[nf,...S.foods.filter(f=>f.n.toLowerCase()!==name.toLowerCase())].slice(0,150);
+  save("settings",S);
+  $("ovAdd").classList.remove("on");render();
+}
+
+/* ---- eventos ---- */
+$("prev").onclick=()=>{cur=new Date(cur.getTime()-864e5);loadDay()};
+$("next").onclick=()=>{cur=new Date(cur.getTime()+864e5);loadDay()};
+$("meals").addEventListener("click",e=>{
+  const a=e.target.closest("[data-add]");if(a)return openAdd(a.dataset.add);
+  const d=e.target.closest("[data-del]");if(d){D.entries=D.entries.filter(x=>x.id!==d.dataset.del);save("d-"+key(cur),D);render()}
+});
+document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{D.water=Math.max(0,D.water+ +b.dataset.w);save("d-"+key(cur),D);render()});
+$("q").oninput=search;
+$("res").onclick=e=>{const b=e.target.closest("[data-i]");if(b)pick($("res")._list[+b.dataset.i])};
+[$("fg"),...F].forEach(x=>x.oninput=preview);
+$("addOk").onclick=addOk;$("addX").onclick=()=>$("ovAdd").classList.remove("on");
+$("goals").onclick=()=>{$("gk").value=S.kcal;$("gp").value=S.p;$("gc").value=S.c;$("gf").value=S.f;$("gw").value=S.water;$("ovGoal").classList.add("on")};
+$("gX").onclick=()=>$("ovGoal").classList.remove("on");
+$("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p=n("gp");S.c=n("gc");S.f=n("gf");S.water=n("gw");save("settings",S);$("ovGoal").classList.remove("on");render()};
+document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("on")}));
+document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"))});
+
+S={...DEF,...(L.get("settings")||{})};
+$("status").textContent="Dados guardados neste dispositivo.";
+loadDay();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
