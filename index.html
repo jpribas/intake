@@ -136,7 +136,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 7 · 24/11/2026</p>
+  <p class="note">Intake · versão 9 · 24/11/2026</p>
 </div>
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
@@ -151,6 +151,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
       <button class="sz" data-sz="grande">Grande</button>
     </div>
     <input id="hint" placeholder="Pista opcional: ex. prato com 200 g de arroz" autocomplete="off">
+    <button class="chip" id="aiStop" hidden>Cancelar análise</button>
     <div id="aiOut"></div>
   </div>
   <label for="q">Procurar alimento</label>
@@ -314,7 +315,7 @@ function openAdd(m){meal=m;$("addT").textContent="Adicionar · "+MEALS.find(x=>x
 /* ---- foto com IA (Gemini) ---- */
 const GK=()=>localStorage.getItem("cal:gkey")||"";
 const GB="https://generativelanguage.googleapis.com/v1beta/";
-let AI=[];
+let AI=[],aiAbort=null,AIM="";
 async function pickModels(){ // escolhe automaticamente os modelos "flash" disponíveis na tua chave
   const r=await fetch(GB+"models?pageSize=1000",{headers:{"x-goog-api-key":GK()}});
   if(!r.ok)throw new Error(r.status===400||r.status===403?"Chave inválida.":"Erro "+r.status);
@@ -336,13 +337,13 @@ const PROMPT=hint=>`És um nutricionista experiente a analisar a foto de uma ref
 
 1. PRODUTOS DE MARCA: se reconheceres um produto de marca ou de cadeia de restaurantes (ex.: Big Mac, McChicken, batatas fritas McDonald's, Whopper, pastel de nata, Compal, Coca-Cola, iogurte Danone), usa o nome comercial e os valores nutricionais OFICIAIS da versão europeia/portuguesa, como um só item (não separes pão, carne, molho…).
 2. NÃO DEIXES NADA DE FORA: inclui todos os alimentos visíveis, mesmo pequenos (enchidos, sementes, frutos secos, queijo ralado), molhos e temperos visíveis, e o óleo/azeite usado a cozinhar quando a comida é frita, salteada ou brilhante (estima-o como item à parte, ex.: "Azeite (cozinhado)").
-3. QUANTIDADES: estima as gramas (ou ml) pelo tamanho do prato, talheres e porções. O utilizador diz que o prato é ${SIZE}. Na dúvida, prefere porções normais de restaurante — não subestimes. Conta as peças quando der (fatias, pedaços) e multiplica pelo peso típico de cada uma.
+3. QUANTIDADES: o utilizador diz que o prato é ${SIZE}. Para cada item, CONTA as peças visíveis (fatias, pedaços, colheradas) e multiplica pelo peso típico de cada peça; para itens a granel (arroz, massa, puré) estima pela área e altura que ocupam no prato (ex.: meia tigela média ≈ 200 g de arroz). Escreve essa conta no campo "how" (ex.: "14 fatias × 11 g", "ocupa ~1/3 da tigela, ~4 cm de altura"). Na dúvida, prefere porções normais de restaurante — não subestimes. Se houver duas variedades do mesmo alimento (ex.: arroz branco e arroz frito), lista-as em separado.
 4. VALORES: dá kcal, proteína, hidratos e gordura POR 100 g, com valores de tabelas de composição (preferir a tabela portuguesa INSA), para o alimento já cozinhado como aparece.
 5. CONFIANÇA: para cada item indica "alta", "media" ou "baixa" — baixa quando não tens a certeza do que é ou da quantidade.
 ${hint?`6. Informação do utilizador (tem prioridade sobre o que vês): "${hint}".`:""}
 
 Nomes em português de Portugal, curtos. Responde APENAS com JSON, sem texto extra:
-{"items":[{"name":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0,"conf":"alta"}]}
+{"items":[{"name":"...","how":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0,"conf":"alta"}]}
 Se não houver comida na foto responde {"items":[]}.`;
 async function analyse(file){
   if(!GK()){$("aiOut").innerHTML=`<p class="small">Primeiro cola a tua chave Gemini em ◎ Metas.</p>`;return}
@@ -350,42 +351,49 @@ async function analyse(file){
   try{
     const b64=await imgToB64(file);
     let models=JSON.parse(localStorage.getItem("cal:gmodels")||"null")||await pickModels();
-    const good=localStorage.getItem("cal:gmodel");if(good&&models.includes(good))models=[good,...models.filter(x=>x!==good)]; // o que funcionou da última vez vai primeiro
+    const good=localStorage.getItem("cal:gmodel");if(good&&models.includes(good)&&!/lite/.test(good))models=[good,...models.filter(x=>x!==good)]; // o que funcionou da última vez vai primeiro
     const body=JSON.stringify({contents:[{parts:[{text:PROMPT($("hint").value.trim())},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{responseMimeType:"application/json"}});
     let res=null,lastErr="";
-    const wait=ms=>new Promise(r=>setTimeout(r,ms));
-    outer: for(const m of models){
-      for(let t=0;t<2;t++){ // 2 tentativas por modelo
-        btn.textContent=t||m!==models[0]?"A tentar de novo…":"A analisar a foto…";
-        const ac=new AbortController(),to=setTimeout(()=>ac.abort(),30000);
-        let r;
-        try{r=await fetch(GB+"models/"+m+":generateContent",{method:"POST",headers:{"x-goog-api-key":GK(),"Content-Type":"application/json"},body,signal:ac.signal})}
-        catch(e){clearTimeout(to);lastErr=e.name==="AbortError"?"O Gemini demorou demasiado — tenta outra vez.":"Sem ligação à internet.";continue}
-        clearTimeout(to);
-        if(r.ok){res=await r.json();localStorage.setItem("cal:gmodel",m);break outer}
-        if(r.status===400||r.status===403){lastErr="Chave inválida ou sem acesso.";break outer}
-        if(r.status===429){lastErr="Limite gratuito atingido — tenta daqui a um minuto.";break} // passa ao modelo seguinte
-        if(r.status===404){lastErr="Modelo indisponível.";localStorage.removeItem("cal:gmodels");break}
-        lastErr="Servidores do Gemini ocupados — tenta daqui a pouco."; // 500/503
-        if(r.status===503)break; // modelo sobrecarregado: passa logo ao seguinte
-        await wait(1500);
-      }
+    // ordem: o que funcionou antes → depois alterna normal/lite (os "lite" costumam estar menos ocupados) → máx. 5 modelos, 60 s no total
+    // ordem: modelos normais primeiro (melhor qualidade); os "lite" só como reserva; máx. 5 modelos, 60 s no total
+    const full=models.filter(x=>!/lite/.test(x)),lite=models.filter(x=>/lite/.test(x));
+    const good0=/lite/.test(models[0])?[]:[models[0]];
+    const order=[...new Set([...good0,...full.slice(0,3),...lite.slice(0,2)])].slice(0,5);
+    const deadline=Date.now()+60000;
+    aiAbort=new AbortController();$("aiStop").hidden=false;
+    for(let i=0;i<order.length;i++){
+      const m=order[i];
+      if(aiAbort.signal.aborted){lastErr="Cancelado.";break}
+      if(Date.now()>deadline){lastErr="O Gemini está muito ocupado agora — tenta daqui a uns minutos.";break}
+      btn.textContent=i?`A tentar outro modelo (${i+1}/${order.length})…`:"A analisar a foto…";
+      const ac=new AbortController(),to=setTimeout(()=>ac.abort(),Math.min(20000,deadline-Date.now()));
+      const stop=()=>ac.abort();aiAbort.signal.addEventListener("abort",stop);
+      let r;
+      try{r=await fetch(GB+"models/"+m+":generateContent",{method:"POST",headers:{"x-goog-api-key":GK(),"Content-Type":"application/json"},body,signal:ac.signal})}
+      catch(e){clearTimeout(to);aiAbort.signal.removeEventListener("abort",stop);lastErr=aiAbort.signal.aborted?"Cancelado.":e.name==="AbortError"?"O Gemini demorou demasiado — tenta outra vez.":"Sem ligação à internet.";continue}
+      clearTimeout(to);aiAbort.signal.removeEventListener("abort",stop);
+      if(r.ok){res=await r.json();localStorage.setItem("cal:gmodel",m);break}
+      if(r.status===400||r.status===403){lastErr="Chave inválida ou sem acesso.";break}
+      if(r.status===429){lastErr="Limite gratuito atingido — tenta daqui a um minuto.";continue}
+      if(r.status===404){lastErr="Modelo indisponível.";localStorage.removeItem("cal:gmodels");continue}
+      lastErr="O Gemini está muito ocupado agora — tenta daqui a uns minutos.";
     }
+    $("aiStop").hidden=true;
     if(!res)throw new Error(lastErr);
     const txt=(res.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/^```(json)?|```$/g,"").trim();
-    const items=(JSON.parse(txt).items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,cf:["alta","media","baixa"].includes(String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""))?String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""):"media",on:true}));
-    AI=items;renderAI();
+    const items=(JSON.parse(txt).items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),how:String(x.how||"").slice(0,80),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,cf:["alta","media","baixa"].includes(String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""))?String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""):"media",on:true}));
+    AI=items;AIM=localStorage.getItem("cal:gmodel")||"";renderAI();
   }catch(e){$("aiOut").innerHTML=`<p class="small">${esc(e.message||"Erro a analisar.")}</p>`}
-  btn.disabled=false;btn.textContent="📷 Calcular por foto";
+  btn.disabled=false;btn.textContent="📷 Calcular por foto";$("aiStop").hidden=true;
 }
 function renderAI(){
   if(!AI.length){$("aiOut").innerHTML=`<p class="small">Não encontrei comida na foto. Tenta outra ou adiciona à mão.</p>`;return}
   $("aiOut").innerHTML=`<div class="ai"><p class="small">Confirma as quantidades (a IA erra mais nas gramas):</p>`+AI.map((x,i)=>`<div class="air${x.cf==="baixa"?" low":""}">
     <input type="checkbox" data-ai-on="${i}" ${x.on?"checked":""} aria-label="Incluir ${esc(x.n)}">
-    <div class="nm">${esc(x.n)}<span class="cf ${x.cf}">${x.cf==="alta"?"certeza alta":x.cf==="baixa"?"verifica":"média"}</span><small>${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
+    <div class="nm">${esc(x.n)}<span class="cf ${x.cf}">${x.cf==="alta"?"certeza alta":x.cf==="baixa"?"verifica":"média"}</span><small>${x.how?esc(x.how)+" · ":""}${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
     <input type="number" inputmode="decimal" data-ai-g="${i}" value="${r0(x.g)}" aria-label="Gramas de ${esc(x.n)}">
     <span class="kk" id="aik${i}">${r0(x.k*x.g/100)}</span></div>`).join("")+
-    `<div class="aitot" id="aitot"></div><div class="acts"><button class="pri" id="aiAdd">Adicionar selecionados</button></div></div>`;
+    `<div class="aitot" id="aitot"></div><p class="small">Analisado por ${esc(AIM)}${/lite/.test(AIM)?" (modelo leve — confirma bem as gramas)":""}</p><div class="acts"><button class="pri" id="aiAdd">Adicionar selecionados</button></div></div>`;
   aiTot();
 }
 function aiTot(){const t=AI.filter(x=>x.on).reduce((a,x)=>({k:a.k+x.k*x.g/100,p:a.p+x.p*x.g/100,c:a.c+x.c*x.g/100,f:a.f+x.f*x.g/100}),{k:0,p:0,c:0,f:0});
@@ -399,6 +407,7 @@ function aiAdd(){
   $("ovAdd").classList.remove("on");render();
 }
 $("photoBtn").onclick=()=>$("photoIn").click();
+$("aiStop").onclick=()=>{if(aiAbort)aiAbort.abort()};
 document.querySelectorAll(".sz").forEach(b=>b.onclick=()=>{SIZE=b.dataset.sz;document.querySelectorAll(".sz").forEach(x=>x.classList.toggle("on",x===b))});
 $("photoIn").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)analyse(f)};
 $("aiOut").addEventListener("input",e=>{const i=e.target.dataset.aiG;if(i!==undefined){AI[i].g=+e.target.value||0;$("aik"+i).textContent=r0(AI[i].k*AI[i].g/100);aiTot()}});
