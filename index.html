@@ -136,7 +136,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 9 · 24/11/2026</p>
+  <p class="note">Intake · versão 10 · 25/11/2026</p>
 </div>
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
@@ -345,7 +345,9 @@ ${hint?`6. Informação do utilizador (tem prioridade sobre o que vês): "${hint
 Nomes em português de Portugal, curtos. Responde APENAS com JSON, sem texto extra:
 {"items":[{"name":"...","how":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0,"conf":"alta"}]}
 Se não houver comida na foto responde {"items":[]}.`;
+let lastFile=null,retryT=null;
 async function analyse(file){
+  lastFile=file;clearInterval(retryT);
   if(!GK()){$("aiOut").innerHTML=`<p class="small">Primeiro cola a tua chave Gemini em ◎ Metas.</p>`;return}
   const btn=$("photoBtn");btn.disabled=true;btn.textContent="A analisar a foto…";$("aiOut").innerHTML="";
   try{
@@ -383,7 +385,16 @@ async function analyse(file){
     const txt=(res.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/^```(json)?|```$/g,"").trim();
     const items=(JSON.parse(txt).items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),how:String(x.how||"").slice(0,80),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,cf:["alta","media","baixa"].includes(String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""))?String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""):"media",on:true}));
     AI=items;AIM=localStorage.getItem("cal:gmodel")||"";renderAI();
-  }catch(e){$("aiOut").innerHTML=`<p class="small">${esc(e.message||"Erro a analisar.")}</p>`}
+  }catch(e){
+    const msg=e.message||"Erro a analisar.";
+    const canRetry=!/Chave|Cancelado|chave Gemini/.test(msg);
+    $("aiOut").innerHTML=`<p class="small">${esc(msg)}</p>`+(canRetry?`<div class="acts"><button class="pri" id="aiRetry">Tentar outra vez</button></div><p class="small" id="aiCount"></p>`:"");
+    if(canRetry){ // repete sozinho daqui a 30 s (uma vez), sem escolher a foto de novo
+      let n=30;$("aiCount").textContent=`Tento outra vez sozinho daqui a ${n} s…`;
+      retryT=setInterval(()=>{n--;const el=$("aiCount");if(!el||!$("ovAdd").classList.contains("on")){clearInterval(retryT);return}
+        if(n<=0){clearInterval(retryT);analyse(lastFile)}else el.textContent=`Tento outra vez sozinho daqui a ${n} s…`},1000);
+    }
+  }
   btn.disabled=false;btn.textContent="📷 Calcular por foto";$("aiStop").hidden=true;
 }
 function renderAI(){
@@ -412,7 +423,7 @@ document.querySelectorAll(".sz").forEach(b=>b.onclick=()=>{SIZE=b.dataset.sz;doc
 $("photoIn").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)analyse(f)};
 $("aiOut").addEventListener("input",e=>{const i=e.target.dataset.aiG;if(i!==undefined){AI[i].g=+e.target.value||0;$("aik"+i).textContent=r0(AI[i].k*AI[i].g/100);aiTot()}});
 $("aiOut").addEventListener("change",e=>{const i=e.target.dataset.aiOn;if(i!==undefined){AI[i].on=e.target.checked;aiTot()}});
-$("aiOut").addEventListener("click",e=>{if(e.target.id==="aiAdd")aiAdd()});
+$("aiOut").addEventListener("click",e=>{if(e.target.id==="aiAdd")aiAdd();if(e.target.id==="aiRetry"&&lastFile){clearInterval(retryT);analyse(lastFile)}});
 function addOk(){
   const name=$("fn").value.trim(),v=calc();
   if(!name||!v.g){$("fn").focus();return}
@@ -434,7 +445,7 @@ document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{D.water=Math.max
 $("q").oninput=search;
 $("res").onclick=e=>{const b=e.target.closest("[data-i]");if(b)pick($("res")._list[+b.dataset.i])};
 [$("fg"),...F].forEach(x=>x.oninput=preview);
-$("addOk").onclick=addOk;$("addX").onclick=()=>$("ovAdd").classList.remove("on");
+$("addOk").onclick=addOk;$("addX").onclick=()=>{clearInterval(retryT);$("ovAdd").classList.remove("on")};
 $("goals").onclick=()=>{$("gk").value=S.kcal;$("gp").value=S.p;$("gc").value=S.c;$("gf").value=S.f;$("gw").value=S.water;$("gkey").value=GK();
   const m=localStorage.getItem("cal:gmodel");$("gmodel").textContent=m?"Modelo: "+m:"";$("ovGoal").classList.add("on")};
 $("gX").onclick=()=>$("ovGoal").classList.remove("on");
