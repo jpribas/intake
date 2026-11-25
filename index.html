@@ -225,6 +225,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     </div>
   </div>
 
+  <div class="card" id="trainCard" hidden></div>
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
 </section>
@@ -258,7 +259,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <button class="row" id="cloud"><span class="grow">Google Drive<small id="cloudtxt">Sincronizar entre telemóvel e PC</small></span><span class="go">☁</span></button>
   </div>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 20 · 25/11/2026</p>
+  <p class="note">Intake · versão 21 · 25/11/2026</p>
 </section>
 </div>
 
@@ -383,6 +384,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <div><label for="gf">Gordura (g)</label><input id="gf" type="number" inputmode="numeric"></div>
   </div>
   <label for="gw">Água (ml)</label><input id="gw" type="number" inputmode="numeric">
+  <label for="gtb">Extra em dia de treino (kcal) — 0 se a meta já conta com os treinos</label><input id="gtb" type="number" inputmode="numeric" placeholder="0">
   <label for="gkey">Chave da API Gemini (só fica neste aparelho)</label>
   <input id="gkey" type="password" autocomplete="off" placeholder="Cola aqui a chave do Google AI Studio">
   <p class="small">Cria a chave em <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. <span id="gmodel"></span></p>
@@ -483,29 +485,43 @@ function loadDay(){D=L.get("d-"+key(cur))||{entries:[],water:0};render()}
 function tot(list){return list.reduce((a,e)=>({k:a.k+e.kcal,p:a.p+e.p,c:a.c+e.c,f:a.f+e.f}),{k:0,p:0,c:0,f:0})}
 function dayLabel(){const t=new Date();t.setHours(12,0,0,0);const diff=Math.round((cur-t)/864e5);
   return diff===0?"Hoje":diff===-1?"Ontem":diff===1?"Amanhã":cur.toLocaleDateString("pt-PT",{weekday:"short",day:"numeric",month:"short"})}
+/* ---- ligação ao Output (treinos do mesmo site) ---- */
+function bodyKg(){const w=S.weights&&S.weights[S.weights.length-1];return w?w.kg:(S.profile&&S.profile.kg)||70}
+function wKcal(w){const h=w.swim?w.swim.min/60:Math.min(2.5,((w.end||Date.now())-w.start)/3600e3);const met=w.swim?(w.swim.m/w.swim.min>=30?8:6):5;return Math.round(met*bodyKg()*h/10)*10}
+function trainOf(d){const k=key(d),out=[];let db=null;try{db=JSON.parse(localStorage.getItem("out:data"))}catch(e){}
+  for(const w of (db&&db.workouts)||[]){const t=new Date(w.start);t.setHours(12,0,0,0);if(key(t)===k)out.push(w)}
+  try{const c=JSON.parse(localStorage.getItem("out:cur"));if(c){const t=new Date(c.start);t.setHours(12,0,0,0);if(key(t)===k&&!out.some(w=>w.id===c.id))out.push({...c,live:1})}}catch(e){}
+  return out.sort((a,b)=>a.start-b.start)}
+function renderTrain(TR){const el=$("trainCard");if(!TR.length){el.hidden=true;return}el.hidden=false;
+  const kc=TR.reduce((a,w)=>a+wKcal(w),0),b=S.tb||0;
+  el.innerHTML=`<div class="ch"><h2>Treino</h2><span class="k">≈ ${kc} kcal gastas</span></div>`+
+    TR.map(w=>`<a class="it" href="../output/" style="text-decoration:none;color:inherit"><div class="n"><div>${w.swim?"🏊":"🏋"} ${esc(w.title)}${w.live?" · a decorrer":""}</div><div>${w.swim?`${w.swim.m} m · ${w.swim.min} min`:`${Math.round(((w.end||Date.now())-w.start)/60000)} min · ${(w.ex||[]).length} exercícios`}</div></div><span class="kk">${wKcal(w)}</span></a>`).join("")+
+    `<p class="small" style="margin:0 16px 12px">${b?`Meta de hoje +${b} kcal por ser dia de treino.`:`A tua meta já conta com os treinos da semana. Podes pôr um extra para dias de treino em Mais → Ajustar metas.`}</p>`}
 function render(){
   $("dlabel").textContent=dayLabel();
-  const T=tot(D.entries),rem=S.kcal-T.k,pct=Math.min(T.k/S.kcal,1);
+  const TR=trainOf(cur),BON=TR.length&&S.tb?S.tb:0,KG=S.kcal+BON,CG=S.c+Math.round(BON/4);renderTrain(TR);
+  const T=tot(D.entries),rem=KG-T.k,pct=Math.min(T.k/KG,1);
   const ring=(v,goal,col,big,lab,sub)=>{const p=goal>0?Math.min(v/goal,1):0,C=2*Math.PI*52;
     return `<div><div class="mini" style="max-width:${big?150:110}px"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--line)" stroke-width="${big?11:10}"/>${p>0?`<circle cx="60" cy="60" r="52" fill="none" stroke="${col}" stroke-width="${big?11:10}" stroke-linecap="round" stroke-dasharray="${(p*C).toFixed(1)} ${C.toFixed(1)}" style="transition:stroke-dasharray .5s"/>`:""}</svg>
       <div class="ctr"><b>${lab}</b><small>${sub}</small></div></div></div>`};
   const over=rem<0;
   $("trio").innerHTML=
-    `<div>${ring(T.k,S.kcal,"var(--mute)",0,r0(T.k),"kcal")}<div class="lbl">Comido</div></div>`+
-    `<div>${ring(T.k,S.kcal,over?"#c0392b":"var(--acc)",1,r0(Math.abs(rem)),"kcal")}<div class="lbl">${over?"Acima da meta":"Restantes"}</div></div>`+
-    `<div>${ring(S.kcal,S.kcal,"var(--line)",0,S.kcal,"kcal")}<div class="lbl">Meta</div></div>`;
+    `<div>${ring(T.k,KG,"var(--mute)",0,r0(T.k),"kcal")}<div class="lbl">Comido</div></div>`+
+    `<div>${ring(T.k,KG,over?"#c0392b":"var(--acc)",1,r0(Math.abs(rem)),"kcal")}<div class="lbl">${over?"Acima da meta":"Restantes"}</div></div>`+
+    `<div>${ring(KG,KG,"var(--line)",0,KG,"kcal")}<div class="lbl">Meta</div></div>`;
   const mr=(v,g,col,n)=>`<div>${ring(v,g,col,0,r0(v),"/ "+g+" g")}<div class="lbl">${n}<small>${v>=g?"meta atingida":"faltam "+r0(g-v)+" g"}</small></div></div>`;
-  $("rings").innerHTML=mr(T.p,S.p,"var(--p)","Proteína")+mr(T.c,S.c,"var(--c)","Hidratos")+mr(T.f,S.f,"var(--f)","Gordura");
+  $("rings").innerHTML=mr(T.p,S.p,"var(--p)","Proteína")+mr(T.c,CG,"var(--c)","Hidratos")+mr(T.f,S.f,"var(--f)","Gordura");
   const mk=MEALS.map(([id,n])=>[n,tot(D.entries.filter(e=>e.meal===id)).k]),mx=Math.max(1,...mk.map(x=>x[1]));
   $("permeal").innerHTML=T.k?mk.map(([n,k])=>`<div class="r"><span>${n}</span><div class="bar"><i style="width:${k/mx*100}%;background:var(--acc)"></i></div><span>${r0(k)}</span></div>`).join("")+
-    `<p class="small" style="margin:0">Total ${r0(T.k)} kcal de ${S.kcal}.</p>`:`<p class="small">Ainda não registaste nada neste dia.</p>`;
+    `<p class="small" style="margin:0">Total ${r0(T.k)} kcal de ${KG}.</p>`:`<p class="small">Ainda não registaste nada neste dia.</p>`;
   $("wk").textContent=`${D.water} / ${S.water} ml`;
   $("wbar").style.width=Math.min(D.water/S.water*100,100)+"%";
   $("meals").innerHTML=MEALS.map(([id,name])=>{
     const L2=D.entries.filter(e=>e.meal===id),t=tot(L2);
+    const Y=L2.length?[]:((L.get("d-"+key(new Date(cur.getTime()-864e5)))||{}).entries||[]).filter(e=>e.meal===id);
     return `<div class="card"><div class="ch"><h2>${name}</h2><span class="k">${r0(t.k)} kcal</span><button class="add" data-add="${id}" aria-label="Adicionar a ${name}">+</button></div>`+
       L2.map(e=>`<div class="it" data-edit="${esc(e.id)}"><div class="n"><div>${esc(e.name)}</div><div>${e.un?esc(e.un)+" · ":""}${r0(e.g)} g · P ${r1(e.p)} · H ${r1(e.c)} · G ${r1(e.f)}</div></div><span class="kk">${r0(e.kcal)}</span><button class="del" data-del="${esc(e.id)}" aria-label="Apagar">✕</button></div>`).join("")+
-      (L2.length>1?`<div style="padding:0 12px 8px 16px;text-align:right"><button class="mealbtn" data-savemeal="${id}">Guardar como refeição</button></div>`:"")+`</div>`;
+      (Y.length?`<div style="padding:0 12px 10px 16px"><button class="mealbtn" data-yday="${id}">↻ Igual a ontem · ${Y.map(e=>esc(e.name)).slice(0,2).join(", ")}${Y.length>2?"…":""} (${r0(tot(Y).k)} kcal)</button></div>`:"")+(L2.length>1?`<div style="padding:0 12px 8px 16px;text-align:right"><button class="mealbtn" data-savemeal="${id}">Guardar como refeição</button></div>`:"")+`</div>`;
   }).join("");
 }
 
@@ -714,6 +730,8 @@ $("meals").addEventListener("click",e=>{
   const a=e.target.closest("[data-add]");if(a)return openAdd(a.dataset.add);
   const d=e.target.closest("[data-del]");if(d){D.entries=D.entries.filter(x=>x.id!==d.dataset.del);save("d-"+key(cur),D);render();return}
   const sm=e.target.closest("[data-savemeal]");if(sm){openSaveMeal(sm.dataset.savemeal);return}
+  const yd=e.target.closest("[data-yday]");if(yd){const Y=((L.get("d-"+key(new Date(cur.getTime()-864e5)))||{}).entries||[]).filter(x=>x.meal===yd.dataset.yday);
+    D.entries.push(...Y.map(x=>({...x,id:Date.now().toString(36)+Math.random().toString(36).slice(2,6)})));save("d-"+key(cur),D);render();$("status").textContent=`Copiei ${Y.length} alimentos de ontem.`;return}
   const ed=e.target.closest("[data-edit]");if(ed)openEdit(ed.dataset.edit);
 });
 document.querySelectorAll("[data-w]").forEach(b=>b.onclick=()=>{D.water=Math.max(0,D.water+ +b.dataset.w);save("d-"+key(cur),D);render()});
@@ -722,10 +740,10 @@ $("res").onclick=e=>{const b=e.target.closest("[data-i]");if(b)pick($("res")._li
 [$("fg"),...F].forEach(x=>x.oninput=preview);
 $("uN").oninput=unitsToG;$("uG").oninput=unitsToG;
 $("addOk").onclick=addOk;$("addX").onclick=()=>{clearInterval(retryT);$("ovAdd").classList.remove("on")};
-$("goals").onclick=()=>{$("gk").value=S.kcal;$("gp").value=S.p;$("gc").value=S.c;$("gf").value=S.f;$("gw").value=S.water;$("gkey").value=GK();
+$("goals").onclick=()=>{$("gk").value=S.kcal;$("gp").value=S.p;$("gc").value=S.c;$("gf").value=S.f;$("gw").value=S.water;$("gtb").value=S.tb||"";$("gkey").value=GK();
   const m=localStorage.getItem("cal:gmodel");$("gmodel").textContent=m?"Modelo: "+m:"";$("ovGoal").classList.add("on")};
 $("gX").onclick=()=>$("ovGoal").classList.remove("on");
-$("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p=n("gp");S.c=n("gc");S.f=n("gf");S.water=n("gw");save("settings",S);
+$("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p=n("gp");S.c=n("gc");S.f=n("gf");S.water=n("gw");S.tb=Math.max(0,Math.min(1500,Math.round(+$("gtb").value||0)));save("settings",S);
   const k=$("gkey").value.trim();if(k!==GK()){localStorage.setItem("cal:gkey",k);localStorage.removeItem("cal:gmodels");localStorage.removeItem("cal:gmodel")}$("ovGoal").classList.remove("on");render()};
 document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.target===o){o.classList.remove("on");if(o.id==="ovScan")stopScan()}}));
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"));stopScan()}});
@@ -814,8 +832,22 @@ function renderResumo(){
   const avg=(a,f)=>a.length?Math.round(a.reduce((s,x)=>s+f(x),0)/a.length):0;
   const w=logged(7),m=logged(30),onT=w.filter(x=>Math.abs(x.T.k-S.kcal)<=S.kcal*0.1).length;
   if(!m.length){$("resumo").innerHTML=`<p class="empty">Ainda não há registos. Adiciona refeições no Diário e o resumo aparece aqui.</p>`;return}
+  const mon=new Date(t);mon.setDate(mon.getDate()-((mon.getDay()+6)%7));
+  const wd=Math.round((t-mon)/864e5)+1,thisW=days.slice(0,wd).filter(x=>x.T&&x.T.k>0),lastW=[...Array(7)].map((_,i)=>{const d=new Date(mon.getTime()-(i+1)*864e5),v=L.get("d-"+key(d));return v?tot(v.entries||[]):null}).filter(x=>x&&x.k>0);
+  let db=null;try{db=JSON.parse(localStorage.getItem("out:data"))}catch(e){}
+  const tw=((db&&db.workouts)||[]).filter(w=>w.start>=mon.getTime()-12*3600e3),gym=tw.filter(w=>!w.swim).length,sw=tw.filter(w=>w.swim).length,burn=tw.reduce((a,w)=>a+wKcal(w),0);
+  const ws=S.weights||[],wavg=(a,b)=>{const l=ws.filter(x=>{const d=new Date(x.d+"T12:00");return d>=a&&d<b});return l.length?l.reduce((s,x)=>s+x.kg,0)/l.length:null};
+  const wa=wavg(mon,new Date(t.getTime()+864e5)),wb=wavg(new Date(mon.getTime()-7*864e5),mon);
+  const ak=avg(thisW,x=>x.T.k),ap=avg(thisW,x=>x.T.p),lk=lastW.length?Math.round(lastW.reduce((s,x)=>s+x.k,0)/lastW.length):0;
+  const dk=ak-S.kcal,cls=v=>v>=0?"color:var(--p)":"color:#c0392b";
+  const week=`<div class="card" style="padding:14px 16px"><h2 style="margin:0 0 4px;font-size:18px">Esta semana</h2>
+    <p class="small" style="margin:0 0 10px">${thisW.length} de ${wd} dias registados${lk?` · semana passada: ${lk} kcal/dia`:""}</p>
+    <div class="stat" style="margin:0"><div><b>${thisW.length?ak:"—"}</b><span>kcal/dia ${thisW.length?`<em style="${cls(dk)};font-style:normal">(${dk>=0?"+":""}${dk})</em>`:""}</span></div>
+    <div><b>${thisW.length?ap+" g":"—"}</b><span>proteína/dia <em style="${cls(ap-S.p)};font-style:normal">${thisW.length?`(${ap>=S.p?"✓":"−"+(S.p-ap)+" g"})`:""}</em></span></div>
+    <div><b>${gym+sw}</b><span>treinos${gym||sw?` (${gym} 🏋 ${sw} 🏊)`:""}</span></div></div>
+    <p class="small" style="margin:10px 0 0">${burn?`≈ ${burn} kcal gastas em treino. `:""}${wa!=null?`Peso médio ${String(r1(wa)).replace(".",",")} kg${wb!=null?` (${wa-wb>=0?"+":""}${String(r1(wa-wb)).replace(".",",")} kg vs semana passada)`:""}.`:"Pesa-te para ver a tendência da semana."}</p></div>`;
   const max=Math.max(S.kcal*1.25,...days.slice(0,7).map(x=>x.T?x.T.k:0));
-  $("resumo").innerHTML=`<div class="stat"><div><b>${avg(w,x=>x.T.k)}</b><span>kcal/dia (7 dias)</span></div><div><b>${avg(w,x=>x.T.p)} g</b><span>proteína/dia</span></div><div><b>${onT}/${w.length}</b><span>dias na meta ±10%</span></div></div>
+  $("resumo").innerHTML=week+`<h3 class="sec" style="margin-top:16px">ÚLTIMOS 7 DIAS</h3><div class="stat"><div><b>${avg(w,x=>x.T.k)}</b><span>kcal/dia (7 dias)</span></div><div><b>${avg(w,x=>x.T.p)} g</b><span>proteína/dia</span></div><div><b>${onT}/${w.length}</b><span>dias na meta ±10%</span></div></div>
   <div class="days">`+days.slice(0,7).reverse().map(x=>{const k=x.T?x.T.k:0,c=k>S.kcal*1.1?"#c0392b":k<S.kcal*0.9?"var(--c)":"var(--p)";
     return `<div class="day"><span>${x.d.toLocaleDateString("pt-PT",{weekday:"short"})}</span><div class="bar"><i style="width:${k/max*100}%;background:${c}"></i><span class="goal" style="left:${S.kcal/max*100}%"></span></div><span>${k?r0(k):"—"}</span></div>`}).join("")+
   `</div><p class="small">Linha = meta (${S.kcal} kcal). Verde: na meta · azul: abaixo · vermelho: acima. Média de 30 dias: ${avg(m,x=>x.T.k)} kcal (${m.length} dias registados).</p>`;
