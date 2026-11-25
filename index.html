@@ -64,6 +64,19 @@ h1,h2,.num{font-family:Outfit,Inter,sans-serif}
 .prod{border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:6px;display:grid;gap:8px}
 .prod .src{font-size:12px;color:var(--mute)}
 .prod .units{display:flex;gap:6px;flex-wrap:wrap}
+.wiz .stepn{font-size:13px;color:var(--mute);margin:0 0 4px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{min-height:44px;padding:0 14px;border-radius:22px;border:1px solid var(--line);background:var(--bg);font-size:15px}
+.seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.opt{display:grid;gap:6px}
+.opt button{text-align:left;min-height:54px;padding:8px 14px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-size:15px}
+.opt button small{display:block;color:var(--mute);font-size:13px}
+.opt button.on{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc)}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.res2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0}
+.res2 div{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+.res2 b{display:block;font-family:Outfit;font-size:26px}.res2 span{font-size:13px;color:var(--mute)}
+.res2 .wide{grid-column:1/-1}.res2 .wide b{font-size:38px;color:var(--acc)}
 .empty{color:var(--mute);text-align:center;padding:24px 8px}
 .top{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
 .top h1{flex:1;text-align:center;font-size:22px;margin:0}
@@ -219,11 +232,12 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 <section class="tab" id="tab-mais" hidden>
   <h1 class="ttl">Mais</h1>
   <div class="rows">
-    <button class="row" id="goals"><span class="grow">Metas e chave da IA<small>Calorias, macros, água e chave Gemini</small></span><span class="go">›</span></button>
+    <button class="row" id="profile"><span class="grow">Perfil e objetivo<small id="proftxt">Peso, altura, atividade e objetivo</small></span><span class="go">›</span></button>
+    <button class="row" id="goals"><span class="grow">Ajustar metas à mão e chave da IA<small>Calorias, macros, água e chave Gemini</small></span><span class="go">›</span></button>
     <button class="row" id="cloud"><span class="grow">Google Drive<small id="cloudtxt">Sincronizar entre telemóvel e PC</small></span><span class="go">☁</span></button>
   </div>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 15 · 25/11/2026</p>
+  <p class="note">Intake · versão 16 · 25/11/2026</p>
 </section>
 </div>
 
@@ -283,6 +297,47 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <label for="scanCode">Ou escreve o número</label>
   <div class="manual"><input id="scanCode" inputmode="numeric" placeholder="ex.: 5601312065166" autocomplete="off"><button id="scanGo">Procurar</button></div>
   <div class="acts"><button id="scanX">Cancelar</button></div>
+</div></div>
+
+<div class="ov" id="ovSetup"><div class="sh wiz" role="dialog" aria-modal="true" aria-labelledby="wzT">
+  <div id="wz1">
+    <p class="stepn">Passo 1 de 3</p>
+    <h2 id="wzT">Bem-vindo à Intake</h2>
+    <p class="small">Diz-me um pouco sobre ti para calcular as tuas metas diárias.</p>
+    <label>Sexo</label>
+    <div class="seg" id="wSex"><button data-v="m">Masculino</button><button data-v="f">Feminino</button></div>
+    <div class="g3">
+      <div><label for="wAge">Idade</label><input id="wAge" type="number" inputmode="numeric" placeholder="anos"></div>
+      <div><label for="wH">Altura (cm)</label><input id="wH" type="number" inputmode="numeric" placeholder="cm"></div>
+      <div><label for="wW">Peso (kg)</label><input id="wW" type="number" inputmode="decimal" placeholder="kg"></div>
+    </div>
+    <p class="small" id="wz1err"></p>
+    <div class="acts"><button id="wzSync">Já uso noutro aparelho</button><button class="pri" id="wzN1">Seguinte</button></div>
+  </div>
+  <div id="wz2" hidden>
+    <p class="stepn">Passo 2 de 3</p>
+    <h2>Atividade e objetivo</h2>
+    <label>Quão ativo és no dia a dia (contando com o treino)?</label>
+    <div class="opt" id="wAct">
+      <button data-v="1.2">Sedentário<small>Trabalho sentado, pouco ou nenhum exercício</small></button>
+      <button data-v="1.375">Ligeiro<small>Treino 1–3 vezes por semana</small></button>
+      <button data-v="1.55">Moderado<small>Treino 3–5 vezes por semana</small></button>
+      <button data-v="1.725">Muito ativo<small>Treino 6–7 vezes por semana ou trabalho físico</small></button>
+    </div>
+    <label>Objetivo</label>
+    <div class="seg" id="wGoal"><button data-v="lose">Perder peso</button><button data-v="keep">Manter</button><button data-v="gain">Ganhar peso</button></div>
+    <div id="wRateBox"><label>Ritmo</label><div class="seg" id="wRate"></div></div>
+    <div id="wTgtBox"><label for="wT">Peso alvo (kg, opcional)</label><input id="wT" type="number" inputmode="decimal" placeholder="kg"></div>
+    <p class="small" id="wz2err"></p>
+    <div class="acts"><button id="wzB2">Voltar</button><button class="pri" id="wzN2">Calcular</button></div>
+  </div>
+  <div id="wz3" hidden>
+    <p class="stepn">Passo 3 de 3</p>
+    <h2>As tuas metas diárias</h2>
+    <div class="res2" id="wRes"></div>
+    <p class="small" id="wExpl"></p>
+    <div class="acts"><button id="wzB3">Voltar</button><button class="pri" id="wzOk">Começar</button></div>
+  </div>
 </div></div>
 
 <div class="ov" id="ovGoal"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="gT">
@@ -377,6 +432,7 @@ async function syncNow(interactive){
     if(!fileId)await findFile();
     if(fileId){const r=await api(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       if(merge(await r.json())){S={...DEF,...(L.get("settings")||{})};loadDay()}}
+    if(typeof profTxt==="function"){profTxt();if(!S.profile&&!window.wizShown){window.wizShown=true;openSetup()}}
     await upload();
     localStorage.setItem("cal:gdrive","1");
     setCloud("on","Sincronizado com o Google Drive · "+new Date().toLocaleTimeString("pt-PT",{hour:"2-digit",minute:"2-digit"}));
@@ -735,6 +791,69 @@ Responde APENAS com JSON: {"name":"...","kcal100":0,"p100":0,"c100":0,"f100":0,"
   }catch(err){$("prod").innerHTML=old;$("prod").insertAdjacentHTML("beforeend",`<span class="src">${esc(err.message||"Não consegui ler a tabela.")}</span>`)}
   $("photoBtn").textContent="📷 Calcular por foto";$("photoBtn").disabled=false;
 };
+/* ---- assistente de metas (1.ª vez e em Mais → Perfil) ---- */
+const W={sex:null,act:null,goal:null,rate:null};
+const RATES={lose:[[0.25,"0,25 kg/sem","suave"],[0.5,"0,5 kg/sem","recomendado"],[0.75,"0,75 kg/sem","rápido"]],gain:[[0.25,"0,25 kg/sem","recomendado — menos gordura"],[0.5,"0,5 kg/sem","mais rápido"]]};
+function segPick(id,v){document.querySelectorAll("#"+id+" button").forEach(b=>b.classList.toggle("on",b.dataset.v===String(v)))}
+function wzStep(n){[1,2,3].forEach(i=>$("wz"+i).hidden=i!==n);$("ovSetup").querySelector(".sh").scrollTop=0}
+function wzRates(){
+  const r=RATES[W.goal];$("wRateBox").hidden=!r;$("wTgtBox").hidden=!r;
+  if(r){if(!r.some(x=>x[0]===W.rate))W.rate=r.find(x=>/recomendado/.test(x[2]))[0];
+    $("wRate").innerHTML=r.map(([v,l,d])=>`<button data-v="${v}">${l}<small style="display:block;font-size:12px;color:var(--mute)">${d}</small></button>`).join("");segPick("wRate",W.rate)}
+}
+function openSetup(){
+  const p=S.profile||{};Object.assign(W,{sex:p.sex||null,act:p.act||null,goal:p.goal||null,rate:p.rate||null});
+  $("wAge").value=p.age||"";$("wH").value=p.h||"";$("wW").value=p.w||"";$("wT").value=p.target||"";
+  segPick("wSex",W.sex);segPick("wAct",W.act);segPick("wGoal",W.goal);wzRates();
+  $("wz1err").textContent=$("wz2err").textContent="";$("wzSync").hidden=!!S.profile;
+  wzStep(1);$("ovSetup").classList.add("on");
+}
+function calcGoals(){
+  const age=+$("wAge").value,h=+$("wH").value,w=+$("wW").value;
+  const bmr=10*w+6.25*h-5*age+(W.sex==="m"?5:-161);            // Mifflin-St Jeor
+  const tdee=bmr*W.act;
+  const delta=W.goal==="keep"?0:(W.goal==="gain"?1:-1)*W.rate*7700/7; // 1 kg ≈ 7700 kcal
+  const floor=W.sex==="m"?1500:1200;
+  let kcal=Math.round((tdee+delta)/10)*10;const floored=kcal<floor;if(floored)kcal=floor;
+  const pk=W.goal==="lose"?2.2:W.goal==="gain"?2.0:1.8;
+  const p=Math.round(w*pk),f=Math.round(kcal*0.25/9),c=Math.max(0,Math.round((kcal-p*4-f*9)/4));
+  return {kcal,p,c,f,water:Math.round(w*35/250)*250,tdee:Math.round(tdee),bmr:Math.round(bmr),delta:Math.round(delta),floored};
+}
+$("wSex").onclick=e=>{const b=e.target.closest("[data-v]");if(b){W.sex=b.dataset.v;segPick("wSex",W.sex)}};
+$("wAct").onclick=e=>{const b=e.target.closest("[data-v]");if(b){W.act=+b.dataset.v;segPick("wAct",W.act)}};
+$("wGoal").onclick=e=>{const b=e.target.closest("[data-v]");if(b){W.goal=b.dataset.v;segPick("wGoal",W.goal);wzRates()}};
+$("wRate").onclick=e=>{const b=e.target.closest("[data-v]");if(b){W.rate=+b.dataset.v;segPick("wRate",W.rate)}};
+$("wzN1").onclick=()=>{
+  const age=+$("wAge").value,h=+$("wH").value,w=+$("wW").value;
+  $("wz1err").textContent=!W.sex?"Escolhe o sexo (entra no cálculo do metabolismo).":!(age>=14&&age<=100)?"Idade entre 14 e 100.":!(h>=120&&h<=230)?"Altura em cm, entre 120 e 230.":!(w>=35&&w<=300)?"Peso em kg, entre 35 e 300.":"";
+  if(!$("wz1err").textContent)wzStep(2);
+};
+$("wzB2").onclick=()=>wzStep(1);$("wzB3").onclick=()=>wzStep(2);
+$("wzN2").onclick=()=>{
+  if(!W.act||!W.goal){$("wz2err").textContent="Escolhe a atividade e o objetivo.";return}
+  const t=+$("wT").value,w=+$("wW").value;
+  if(t&&((W.goal==="lose"&&t>=w)||(W.goal==="gain"&&t<=w))){$("wz2err").textContent=W.goal==="lose"?"O peso alvo tem de ser menor que o atual.":"O peso alvo tem de ser maior que o atual.";return}
+  $("wz2err").textContent="";
+  const g=calcGoals();
+  $("wRes").innerHTML=`<div class="wide"><b>${g.kcal}</b><span>kcal por dia</span></div><div><b>${g.p} g</b><span>proteína</span></div><div><b>${g.c} g</b><span>hidratos</span></div><div><b>${g.f} g</b><span>gordura</span></div><div><b>${(g.water/1000).toLocaleString("pt-PT")} L</b><span>água</span></div>`;
+  const weeks=t&&W.rate?Math.ceil(Math.abs(t-w)/W.rate):0;
+  $("wExpl").textContent=`O teu corpo gasta cerca de ${g.tdee} kcal por dia (${g.bmr} em repouso × atividade). `+
+    (W.goal==="keep"?"Para manter o peso, comes isso.":`Para ${W.goal==="gain"?"ganhar":"perder"} ${String(W.rate).replace(".",",")} kg por semana, ${W.goal==="gain"?"somo":"tiro"} ${Math.abs(g.delta)} kcal por dia.`)+
+    (g.floored?` Ajustei para o mínimo seguro de ${g.kcal} kcal.`:"")+
+    (weeks?` Chegas aos ${String(t).replace(".",",")} kg em cerca de ${weeks} semanas.`:"")+
+    ` A proteína está em ${W.goal==="lose"?"2,2":W.goal==="gain"?"2,0":"1,8"} g por kg. São estimativas: ao fim de 2–3 semanas, ajusta conforme o peso muda.`;
+  wzStep(3);
+};
+$("wzOk").onclick=()=>{
+  const g=calcGoals(),w=+$("wW").value;
+  S.profile={sex:W.sex,age:+$("wAge").value,h:+$("wH").value,w,act:W.act,goal:W.goal,rate:W.goal==="keep"?0:W.rate,target:+$("wT").value||0,date:key(new Date())};
+  Object.assign(S,{kcal:g.kcal,p:g.p,c:g.c,f:g.f,water:g.water});
+  S.weights=S.weights||[];const today=key(new Date());S.weights=[...S.weights.filter(x=>x.d!==today),{d:today,kg:w}].sort((a,b)=>a.d<b.d?-1:1);
+  save("settings",S);$("ovSetup").classList.remove("on");render();profTxt();
+};
+$("wzSync").onclick=async()=>{$("ovSetup").classList.remove("on");await autoSync(!connected());if(!S.profile)openSetup()};
+$("profile").onclick=openSetup;
+function profTxt(){const p=S.profile;$("proftxt").textContent=p?`${String(p.w).replace(".",",")} kg · ${p.h} cm · ${p.goal==="gain"?"ganhar":p.goal==="lose"?"perder":"manter"} peso`:"Peso, altura, atividade e objetivo"}
 /* ---- botão + ---- */
 $("plus").onclick=()=>{$("plMsg").textContent="";$("ovPlus").classList.add("on")};
 $("plX").onclick=()=>$("ovPlus").classList.remove("on");
@@ -749,6 +868,7 @@ $("pCopy").onclick=()=>{
   save("d-"+key(cur),D);render();$("plMsg").textContent=`Copiei ${y.entries.length} alimentos do dia anterior.`;
 };
 S={...DEF,...(L.get("settings")||{})};
+setTimeout(()=>{profTxt();if(!S.profile&&!connected())openSetup()},0);
 $("status").textContent=connected()?"":"Dados guardados neste dispositivo. Toca em ☁ para ligar ao Google Drive.";
 loadDay();
 setCloud("off");
