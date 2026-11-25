@@ -62,7 +62,26 @@ h1,h2,.num{font-family:Outfit,Inter,sans-serif}
 button{font:inherit;color:inherit;cursor:pointer}
 .ib{width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:20px}
 .ib:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
-.sum{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:16px}
+.sum{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px 0 8px;margin-top:16px}
+.slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.slides::-webkit-scrollbar{display:none}
+.slide{flex:0 0 100%;scroll-snap-align:start;padding:0 18px;display:grid;align-content:start;gap:12px}
+.slide h3{margin:0;font:600 13px Inter,sans-serif;color:var(--mute);letter-spacing:.02em}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:center;text-align:center}
+.mini{position:relative;aspect-ratio:1;width:100%;max-width:120px;justify-self:center}
+.mini svg{width:100%;height:100%;transform:rotate(-90deg)}
+.mini .ctr{position:absolute;inset:0;display:grid;place-content:center;line-height:1.1}
+.mini b{font-family:Outfit;font-size:clamp(18px,5vw,24px)}.mini small{font-size:12px;color:var(--mute)}
+.lbl{font-weight:600;font-size:14px;margin-top:4px}
+.lbl small{display:block;font-weight:400;color:var(--mute);font-size:12px}
+.pm{display:grid;gap:10px;padding:4px 0}
+.pm .r{display:grid;grid-template-columns:110px minmax(0,1fr) 60px;gap:10px;align-items:center;font-size:14px}
+.pm .r span:last-child{text-align:right;font-family:Outfit;font-weight:600}
+#trio{grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr)}
+.dots{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:6px}
+.dots button{width:44px;height:36px;border:0;background:transparent;color:var(--mute);font-size:20px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--line);display:inline-block;transition:background .2s}
+.dots i.on{background:var(--ink)}
 .plate{position:relative;aspect-ratio:1;max-width:220px;width:100%;justify-self:center}
 .plate svg{width:100%;height:100%;transform:rotate(-90deg)}
 .plate .ctr{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
@@ -131,7 +150,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 #cloud.on{color:var(--p);border-color:var(--p)}
 #cloud.busy{opacity:.5}
 @media(prefers-reduced-motion:reduce){.bar i,.plate circle{transition:none!important}}
-@media(max-width:420px){.sum{grid-template-columns:minmax(0,1fr)}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.g2{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -144,12 +163,22 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   </div>
   <button class="syncbar" id="syncbar" hidden>☁ Toca para sincronizar com o Google Drive</button>
 
-  <section class="sum">
-    <div class="plate">
-      <svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--line)" stroke-width="12"/><circle id="ring" cx="60" cy="60" r="52" fill="none" stroke="var(--acc)" stroke-width="12" stroke-linecap="round" stroke-dasharray="0 327" style="transition:stroke-dasharray .5s"/></svg>
-      <div class="ctr"><span class="big num" id="rem">0</span><small id="remlab">kcal restantes</small></div>
+  <section class="sum" aria-label="Resumo do dia">
+    <div class="slides" id="slides">
+      <div class="slide">
+        <h3>ENERGIA</h3>
+        <div class="trio" id="trio"></div>
+      </div>
+      <div class="slide">
+        <h3>MACROS</h3>
+        <div class="trio" id="rings"></div>
+      </div>
+      <div class="slide">
+        <h3>POR REFEIÇÃO</h3>
+        <div class="pm" id="permeal"></div>
+      </div>
     </div>
-    <div class="mac" id="mac"></div>
+    <div class="dots"><button id="sPrev" aria-label="Página anterior">‹</button><i class="on"></i><i></i><i></i><button id="sNext" aria-label="Página seguinte">›</button></div>
   </section>
 
   <div class="card water">
@@ -185,7 +214,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <button class="row" id="cloud"><span class="grow">Google Drive<small id="cloudtxt">Sincronizar entre telemóvel e PC</small></span><span class="go">☁</span></button>
   </div>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 13 · 25/11/2026</p>
+  <p class="note">Intake · versão 14 · 25/11/2026</p>
 </section>
 </div>
 
@@ -346,14 +375,19 @@ function dayLabel(){const t=new Date();t.setHours(12,0,0,0);const diff=Math.roun
 function render(){
   $("dlabel").textContent=dayLabel();
   const T=tot(D.entries),rem=S.kcal-T.k,pct=Math.min(T.k/S.kcal,1);
-  $("ring").setAttribute("stroke-dasharray",(pct*326.7).toFixed(1)+" 327");
-  $("ring").setAttribute("stroke",rem<0?"#c0392b":"var(--acc)");
-  $("ring").style.opacity=T.k>0?1:0;
-  $("rem").textContent=r0(Math.abs(rem));
-  $("remlab").textContent=rem<0?"kcal acima da meta":"kcal restantes";
-  const bar=(lab,v,g,col)=>`<div class="row"><div class="lab"><span>${lab}</span><span>${r0(v)} / ${g} g</span></div><div class="bar"><i style="width:${Math.min(v/g*100,100)}%;background:${col}"></i></div></div>`;
-  $("mac").innerHTML=bar("Proteína",T.p,S.p,"var(--p)")+bar("Hidratos",T.c,S.c,"var(--c)")+bar("Gordura",T.f,S.f,"var(--f)")+
-    `<div class="kc"><span>Comido <b>${r0(T.k)}</b></span><span>Meta <b>${S.kcal}</b></span></div>`;
+  const ring=(v,goal,col,big,lab,sub)=>{const p=goal>0?Math.min(v/goal,1):0,C=2*Math.PI*52;
+    return `<div><div class="mini" style="max-width:${big?150:110}px"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" fill="none" stroke="var(--line)" stroke-width="${big?11:10}"/>${p>0?`<circle cx="60" cy="60" r="52" fill="none" stroke="${col}" stroke-width="${big?11:10}" stroke-linecap="round" stroke-dasharray="${(p*C).toFixed(1)} ${C.toFixed(1)}" style="transition:stroke-dasharray .5s"/>`:""}</svg>
+      <div class="ctr"><b>${lab}</b><small>${sub}</small></div></div></div>`};
+  const over=rem<0;
+  $("trio").innerHTML=
+    `<div>${ring(T.k,S.kcal,"var(--mute)",0,r0(T.k),"kcal")}<div class="lbl">Comido</div></div>`+
+    `<div>${ring(T.k,S.kcal,over?"#c0392b":"var(--acc)",1,r0(Math.abs(rem)),"kcal")}<div class="lbl">${over?"Acima da meta":"Restantes"}</div></div>`+
+    `<div>${ring(S.kcal,S.kcal,"var(--line)",0,S.kcal,"kcal")}<div class="lbl">Meta</div></div>`;
+  const mr=(v,g,col,n)=>`<div>${ring(v,g,col,0,r0(v),"/ "+g+" g")}<div class="lbl">${n}<small>${v>=g?"meta atingida":"faltam "+r0(g-v)+" g"}</small></div></div>`;
+  $("rings").innerHTML=mr(T.p,S.p,"var(--p)","Proteína")+mr(T.c,S.c,"var(--c)","Hidratos")+mr(T.f,S.f,"var(--f)","Gordura");
+  const mk=MEALS.map(([id,n])=>[n,tot(D.entries.filter(e=>e.meal===id)).k]),mx=Math.max(1,...mk.map(x=>x[1]));
+  $("permeal").innerHTML=T.k?mk.map(([n,k])=>`<div class="r"><span>${n}</span><div class="bar"><i style="width:${k/mx*100}%;background:var(--acc)"></i></div><span>${r0(k)}</span></div>`).join("")+
+    `<p class="small" style="margin:0">Total ${r0(T.k)} kcal de ${S.kcal}.</p>`:`<p class="small">Ainda não registaste nada neste dia.</p>`;
   $("wk").textContent=`${D.water} / ${S.water} ml`;
   $("wbar").style.width=Math.min(D.water/S.water*100,100)+"%";
   $("meals").innerHTML=MEALS.map(([id,name])=>{
@@ -559,6 +593,13 @@ $("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p
 document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("on")}));
 document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"))});
 
+/* ---- carrossel do resumo ---- */
+{const sl=$("slides"),dots=[...document.querySelectorAll(".dots i")];
+ const idx=()=>Math.round(sl.scrollLeft/sl.clientWidth);
+ const go=i=>sl.scrollTo({left:Math.max(0,Math.min(dots.length-1,i))*sl.clientWidth,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
+ sl.addEventListener("scroll",()=>{const i=idx();dots.forEach((d,j)=>d.classList.toggle("on",j===i))},{passive:true});
+ $("sPrev").onclick=()=>go(idx()-1);$("sNext").onclick=()=>go(idx()+1);
+ sl.addEventListener("keydown",e=>{if(e.key==="ArrowLeft")go(idx()-1);if(e.key==="ArrowRight")go(idx()+1)});sl.tabIndex=0;}
 /* ---- separadores ---- */
 let TAB="diario";
 function showTab(t){TAB=t;document.querySelectorAll(".tab").forEach(x=>x.hidden=x.id!=="tab-"+t);
