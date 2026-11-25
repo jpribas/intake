@@ -136,7 +136,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 11 · 25/11/2026</p>
+  <p class="note">Intake · versão 12 · 25/11/2026</p>
 </div>
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
@@ -144,12 +144,6 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div class="photo">
     <button class="photobtn" id="photoBtn">📷 Calcular por foto</button>
     <input id="photoIn" type="file" accept="image/*" hidden>
-    <div class="sizes" role="group" aria-label="Tamanho do prato">
-      <span>Prato:</span>
-      <button class="sz" data-sz="pequeno">Pequeno</button>
-      <button class="sz on" data-sz="médio">Médio</button>
-      <button class="sz" data-sz="grande">Grande</button>
-    </div>
     <input id="hint" placeholder="Pista opcional: ex. prato com 200 g de arroz" autocomplete="off">
     <button class="chip" id="aiStop" hidden>Cancelar análise</button>
     <div id="aiOut"></div>
@@ -332,7 +326,6 @@ function imgToB64(file){return new Promise((ok,ko)=>{const img=new Image(),u=URL
     c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
     URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",0.85).split(",")[1])};
   img.onerror=()=>ko(new Error("Não foi possível ler a imagem."));img.src=u})}
-let SIZE="médio";
 const norm=t=>String(t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\(.*?\)/g,"").replace(/\s+/g," ").trim();
 /* aprender com as correções: guarda, por alimento, quanto costumas corrigir as gramas da IA (sincroniza com o Drive) */
 function corrText(){
@@ -352,13 +345,14 @@ const RULES=hint=>`És um nutricionista experiente a analisar a foto de uma refe
 
 1. PRODUTOS DE MARCA: se reconheceres um produto de marca ou de cadeia de restaurantes (ex.: Big Mac, McChicken, batatas fritas McDonald's, Whopper, pastel de nata, Compal, Coca-Cola, iogurte Danone), usa o nome comercial e os valores nutricionais OFICIAIS da versão europeia/portuguesa, como um só item (não separes pão, carne, molho…).
 2. NÃO DEIXES NADA DE FORA: inclui todos os alimentos visíveis, mesmo pequenos ou parcialmente escondidos (enchidos, sementes, frutos secos, queijo ralado), molhos e temperos visíveis, e o óleo/azeite usado a cozinhar quando a comida é frita, salteada ou brilhante (como item à parte, ex.: "Azeite (cozinhado)").
-3. ESCALA: usa objetos de referência que apareçam para medir: garfo ≈ 19 cm, faca ≈ 22 cm, colher de sopa ≈ 17 cm, palma da mão adulta ≈ 9 cm de largura, lata 33 cl ≈ 12 cm de altura, prato raso normal ≈ 26 cm, tigela normal ≈ 15 cm. Se não houver referência, o utilizador diz que o prato é ${SIZE}.
-4. QUANTIDADES: para cada item, CONTA as peças visíveis (fatias, pedaços, colheradas) e multiplica pelo peso típico de cada peça; para itens a granel (arroz, massa, puré) estima pela área e altura que ocupam (ex.: meia tigela média ≈ 200 g de arroz). Escreve essa conta no campo "how" (ex.: "14 fatias × 11 g", "ocupa ~1/3 da tigela, ~4 cm de altura"). Na dúvida, prefere porções normais de restaurante — não subestimes. Se houver duas variedades do mesmo alimento (ex.: arroz branco e arroz frito), lista-as em separado.
-5. VALORES: dá kcal, proteína, hidratos e gordura POR 100 g, com valores de tabelas de composição (preferir a tabela portuguesa INSA), para o alimento já cozinhado como aparece.
-6. CONFIANÇA: para cada item indica "alta", "media" ou "baixa" — baixa quando não tens a certeza do que é ou da quantidade.
+3. ESCALA: usa objetos de referência que apareçam para medir: garfo ≈ 19 cm, faca ≈ 22 cm, colher de sopa ≈ 17 cm, palma da mão adulta ≈ 9 cm de largura, lata 33 cl ≈ 12 cm de altura, prato raso normal ≈ 26 cm, tigela normal ≈ 15 cm. Sem referência, estima o tamanho do prato/tigela pelo aspeto (prato raso normal ≈ 26 cm, tigela normal ≈ 15 cm, tigela grande de bowl ≈ 20 cm).
+4. PESO TOTAL PRIMEIRO: antes de dividir por alimentos, estima o peso total da comida no prato e escreve-o em "total_g". Referências de pratos cheios: prato raso normal ≈ 350–500 g, tigela normal ≈ 300–450 g, tigela grande de bowl ≈ 600–800 g, prato de restaurante bem servido ≈ 500–700 g. A soma das gramas dos itens TEM de bater com "total_g" (±10%) — separar um alimento em vários itens não pode diminuir a porção total.
+5. QUANTIDADES: para cada item, CONTA as peças visíveis (fatias, pedaços, colheradas) e multiplica pelo peso típico de cada peça; para itens a granel (arroz, massa, puré) estima pela área e altura que ocupam (ex.: meia tigela média ≈ 200 g de arroz). Escreve essa conta no campo "how" (ex.: "14 fatias × 11 g", "ocupa ~1/3 da tigela, ~4 cm de altura"). Na dúvida, prefere porções normais de restaurante — não subestimes. Se houver duas variedades do mesmo alimento (ex.: arroz branco e arroz frito), lista-as em separado.
+6. VALORES: dá kcal, proteína, hidratos e gordura POR 100 g, com valores de tabelas de composição (preferir a tabela portuguesa INSA), para o alimento já cozinhado como aparece.
+7. CONFIANÇA: para cada item indica "alta", "media" ou "baixa" — baixa quando não tens a certeza do que é ou da quantidade.
 ${corrText()}${hint?`\nINFORMAÇÃO DO UTILIZADOR (tem prioridade sobre o que vês): "${hint}".\n`:""}
 Nomes em português de Portugal, curtos. Responde APENAS com JSON, sem texto extra:
-{"items":[{"name":"...","how":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0,"conf":"alta"}]}
+{"total_g":0,"items":[{"name":"...","how":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0,"conf":"alta"}]}
 Se não houver comida na foto responde {"items":[]}.`;
 const REVIEW=(hint,first)=>RULES(hint)+`
 
@@ -367,7 +361,7 @@ ${JSON.stringify(first)}
 Olha outra vez para a foto com atenção, zona a zona (centro, bordas, por baixo de outros alimentos):
 a) há alimentos, molhos ou gorduras que faltem? acrescenta-os;
 b) algum alimento está mal identificado? corrige o nome e os valores;
-c) as contas das gramas fazem sentido com o tamanho real? corrige-as.
+c) o "total_g" faz sentido para o tamanho real do prato? as gramas dos itens somam esse total? corrige-as — não encolhas as porções ao acrescentar itens.
 Devolve a lista COMPLETA e corrigida, no mesmo formato JSON.`;
 let lastFile=null,retryT=null;
 async function askGemini(order,parts,label,deadline,perReq){ // tenta os modelos por ordem; devolve {json,model} ou lança erro
@@ -435,7 +429,7 @@ async function analyse(file){
 }
 function renderAI(){
   if(!AI.length){$("aiOut").innerHTML=`<p class="small">Não encontrei comida na foto. Tenta outra ou adiciona à mão.</p>`;return}
-  $("aiOut").innerHTML=`<div class="ai"><p class="small">Confirma as quantidades (a IA erra mais nas gramas):</p>`+AI.map((x,i)=>`<div class="air${x.cf==="baixa"?" low":""}">
+  $("aiOut").innerHTML=`<div class="ai"><p class="small">Tira o visto ao que não comeste. As gramas são estimativas — só as mudas se souberes melhor.</p>`+AI.map((x,i)=>`<div class="air${x.cf==="baixa"?" low":""}">
     <input type="checkbox" data-ai-on="${i}" ${x.on?"checked":""} aria-label="Incluir ${esc(x.n)}">
     <div class="nm">${esc(x.n)}${x.added?`<span class="cf alta">novo na revisão</span>`:""}<span class="cf ${x.cf}">${x.cf==="alta"?"certeza alta":x.cf==="baixa"?"verifica":"média"}</span><small>${x.how?esc(x.how)+" · ":""}${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
     <input type="number" inputmode="decimal" data-ai-g="${i}" value="${r0(x.g)}" aria-label="Gramas de ${esc(x.n)}">
@@ -456,7 +450,6 @@ function aiAdd(){
 }
 $("photoBtn").onclick=()=>$("photoIn").click();
 $("aiStop").onclick=()=>{if(aiAbort)aiAbort.abort()};
-document.querySelectorAll(".sz").forEach(b=>b.onclick=()=>{SIZE=b.dataset.sz;document.querySelectorAll(".sz").forEach(x=>x.classList.toggle("on",x===b))});
 $("photoIn").onchange=e=>{const f=e.target.files[0];e.target.value="";if(f)analyse(f)};
 $("aiOut").addEventListener("input",e=>{const i=e.target.dataset.aiG;if(i!==undefined){AI[i].g=+e.target.value||0;$("aik"+i).textContent=r0(AI[i].k*AI[i].g/100);aiTot()}});
 $("aiOut").addEventListener("change",e=>{const i=e.target.dataset.aiOn;if(i!==undefined){AI[i].on=e.target.checked;aiTot()}});
