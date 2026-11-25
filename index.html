@@ -39,7 +39,7 @@ h1,h2,.num{font-family:Outfit,Inter,sans-serif}
 .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:6px 0 14px}
 .tile{border:0;border-radius:18px;aspect-ratio:1;display:grid;place-content:center;justify-items:center;gap:6px;font-weight:600;font-size:14px;color:#1d1b18;text-align:center;padding:6px}
 .tile svg{width:30px;height:30px}
-.t1{background:#ffc7b8}.t2{background:#b9e8cc}.t3{background:#a9d6e3}.t4{background:#e2c9f0}
+.t1{background:#ffc7b8}.t2{background:#b9e8cc}.t3{background:#a9d6e3}.t5{background:#e2c9f0}
 .rows{border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .row{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 16px;border:0;border-bottom:1px solid var(--line);background:var(--card);text-align:left;font-size:16px}
 .row:last-child{border-bottom:0}
@@ -56,6 +56,14 @@ h1,h2,.num{font-family:Outfit,Inter,sans-serif}
 .day .bar{height:12px;position:relative;overflow:visible}
 .day .goal{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.5}
 .day span:last-child{text-align:right;font-family:Outfit;font-weight:600}
+.scan{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px}
+.scan video{width:100%;height:100%;object-fit:cover;display:block}
+.scan .aim{position:absolute;left:12%;right:12%;top:38%;bottom:38%;border:3px solid var(--acc);border-radius:12px;box-shadow:0 0 0 999px rgb(0 0 0/.35)}
+.manual{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.manual button{min-height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--acc);color:#fff;font-weight:600}
+.prod{border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:6px;display:grid;gap:8px}
+.prod .src{font-size:12px;color:var(--mute)}
+.prod .units{display:flex;gap:6px;flex-wrap:wrap}
 .empty{color:var(--mute);text-align:center;padding:24px 8px}
 .top{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
 .top h1{flex:1;text-align:center;font-size:22px;margin:0}
@@ -124,6 +132,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 .acts{display:flex;gap:10px;margin-top:14px}
 .acts button{flex:1;min-height:48px;border-radius:14px;border:1px solid var(--line);background:var(--bg);font-weight:600}
 .acts .pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.photo[hidden]{display:none}
 .photo{border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:6px;display:grid;gap:8px}
 .photobtn{min-height:52px;border-radius:14px;border:0;background:var(--acc);color:#fff;font-weight:600;font-size:17px}
 .photobtn:disabled{opacity:.6}
@@ -214,7 +223,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <button class="row" id="cloud"><span class="grow">Google Drive<small id="cloudtxt">Sincronizar entre telemóvel e PC</small></span><span class="go">☁</span></button>
   </div>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 14 · 25/11/2026</p>
+  <p class="note">Intake · versão 15 · 25/11/2026</p>
 </section>
 </div>
 
@@ -230,10 +239,11 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <h2 id="plT">Adicionar ao diário</h2>
   <div class="tiles">
     <button class="tile t1" id="pPhoto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Foto</button>
-    <button class="tile t2" id="pSearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg>Procurar</button>
+    <button class="tile t2" id="pScan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5h3M17 5h3v2M20 17v2h-3M7 19H4v-2"/><path d="M8 9v6M11 9v6M14 9v6M17 9v6"/></svg>Código de barras</button>
+    <button class="tile t5" id="pSearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg>Procurar</button>
     <button class="tile t3" id="pWater"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>Água +250</button>
-    <button class="tile t4" id="pCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg>Repetir ontem</button>
   </div>
+  <div class="rows"><button class="row" id="pCopy"><span class="grow">Repetir o dia anterior<small>Copia todas as refeições de ontem para este dia</small></span><span class="go">›</span></button></div>
   <p class="small" id="plMsg"></p>
   <div class="acts"><button id="plX">Fechar</button></div>
 </div></div>
@@ -248,6 +258,8 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <button class="chip" id="aiStop" hidden>Cancelar análise</button>
     <div id="aiOut"></div>
   </div>
+  <div class="prod" id="prod" hidden></div>
+  <input id="labelIn" type="file" accept="image/*" hidden>
   <label for="q">Procurar alimento</label>
   <input id="q" placeholder="ex.: arroz, frango, ovo" autocomplete="off">
   <div class="res" id="res"></div>
@@ -262,6 +274,15 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   </div>
   <div class="prev" id="pv"></div>
   <div class="acts"><button id="addX">Cancelar</button><button class="pri" id="addOk">Adicionar</button></div>
+</div></div>
+
+<div class="ov" id="ovScan"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="scT">
+  <h2 id="scT">Código de barras</h2>
+  <div class="scan" id="scanBox"><video id="scanV" playsinline muted></video><div class="aim"></div></div>
+  <p class="small" id="scanMsg">Aponta a câmara para o código de barras.</p>
+  <label for="scanCode">Ou escreve o número</label>
+  <div class="manual"><input id="scanCode" inputmode="numeric" placeholder="ex.: 5601312065166" autocomplete="off"><button id="scanGo">Procurar</button></div>
+  <div class="acts"><button id="scanX">Cancelar</button></div>
 </div></div>
 
 <div class="ov" id="ovGoal"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="gT">
@@ -412,7 +433,7 @@ function preview(){const v=calc();$("pv").innerHTML=`<span><b>${r0(v.kcal)}</b>k
 function setMeal(m){meal=m;$("addT").textContent="Adicionar · "+MEALS.find(x=>x[0]===m)[1];
   $("mealpick").innerHTML=MEALS.map(([id,n])=>`<button data-meal="${id}" class="${id===m?"on":""}">${n}</button>`).join("")}
 function mealNow(){const h=new Date().getHours();return h<11?"pa":h<16?"al":h<19?"la":"ja"}
-function openAdd(m){setMeal(m);
+function openAdd(m){setMeal(m);PCODE=null;$("prod").hidden=true;document.querySelector(".photo").hidden=false;$("prod")._f=null;
   $("q").value="";$("fn").value="";$("fg").value=100;F.forEach(x=>x.value="");$("hint").value="";$("aiOut").innerHTML="";AI=[];search();preview();$("ovAdd").classList.add("on")}
 
 /* ---- foto com IA (Gemini) ---- */
@@ -499,6 +520,12 @@ async function askGemini(order,parts,label,deadline,perReq){ // tenta os modelos
 }
 const cleanConf=c=>{const v=String(c).normalize("NFD").replace(/[̀-ͯ]/g,"");return ["alta","media","baixa"].includes(v)?v:"media"};
 const toItems=j=>(j.items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),how:String(x.how||"").slice(0,80),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,cf:cleanConf(x.conf),on:true}));
+async function modelOrder(){ // modelos normais primeiro (melhor qualidade); os "lite" só como reserva; máx. 5
+  let models=JSON.parse(localStorage.getItem("cal:gmodels")||"null")||await pickModels();
+  const good=localStorage.getItem("cal:gmodel");if(good&&models.includes(good)&&!/lite/.test(good))models=[good,...models.filter(x=>x!==good)];
+  const full=models.filter(x=>!/lite/.test(x)),lite=models.filter(x=>/lite/.test(x));
+  return [...new Set([...(/lite/.test(models[0])?[]:[models[0]]),...full.slice(0,3),...lite.slice(0,2)])].slice(0,5);
+}
 async function analyse(file){
   lastFile=file;clearInterval(retryT);
   if(!GK()){$("aiOut").innerHTML=`<p class="small">Primeiro cola a tua chave Gemini em ◎ Metas.</p>`;return}
@@ -506,11 +533,7 @@ async function analyse(file){
   aiAbort=new AbortController();$("aiStop").hidden=false;
   try{
     const b64=await imgToB64(file),img={inline_data:{mime_type:"image/jpeg",data:b64}},hint=$("hint").value.trim();
-    let models=JSON.parse(localStorage.getItem("cal:gmodels")||"null")||await pickModels();
-    const good=localStorage.getItem("cal:gmodel");if(good&&models.includes(good)&&!/lite/.test(good))models=[good,...models.filter(x=>x!==good)];
-    // modelos normais primeiro (melhor qualidade); os "lite" só como reserva; máx. 5 modelos
-    const full=models.filter(x=>!/lite/.test(x)),lite=models.filter(x=>/lite/.test(x));
-    const order=[...new Set([...(/lite/.test(models[0])?[]:[models[0]]),...full.slice(0,3),...lite.slice(0,2)])].slice(0,5);
+    const order=await modelOrder();
     // 1.ª passagem
     const a=await askGemini(order,[{text:RULES(hint)},img],"A analisar a foto…",Date.now()+70000,25000);
     localStorage.setItem("cal:gmodel",a.model);
@@ -569,6 +592,7 @@ function addOk(){
   D.entries.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),meal,name,g:v.g,kcal:r1(v.kcal),p:r1(v.p),c:r1(v.c),f:r1(v.f)});
   save("d-"+key(cur),D);
   const nf={n:name,...v.per};S.foods=[nf,...S.foods.filter(f=>f.n.toLowerCase()!==name.toLowerCase())].slice(0,150);
+  if(PCODE){S.codes=S.codes||{};const pf=$("prod")._f;S.codes[PCODE]={...nf,units:pf&&pf.units||[]};PCODE=null}
   save("settings",S);
   $("ovAdd").classList.remove("on");render();
 }
@@ -590,8 +614,8 @@ $("goals").onclick=()=>{$("gk").value=S.kcal;$("gp").value=S.p;$("gc").value=S.c
 $("gX").onclick=()=>$("ovGoal").classList.remove("on");
 $("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p=n("gp");S.c=n("gc");S.f=n("gf");S.water=n("gw");save("settings",S);
   const k=$("gkey").value.trim();if(k!==GK()){localStorage.setItem("cal:gkey",k);localStorage.removeItem("cal:gmodels");localStorage.removeItem("cal:gmodel")}$("ovGoal").classList.remove("on");render()};
-document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("on")}));
-document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"))});
+document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.target===o){o.classList.remove("on");if(o.id==="ovScan")stopScan()}}));
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"));stopScan()}});
 
 /* ---- carrossel do resumo ---- */
 {const sl=$("slides"),dots=[...document.querySelectorAll(".dots i")];
@@ -630,10 +654,92 @@ $("foods").addEventListener("click",e=>{
   const d=e.target.closest("[data-fdel]");if(d){S.foods=S.foods.filter(x=>x.n!==d.dataset.fdel);save("settings",S);renderFoods()}
 });
 $("mealpick").addEventListener("click",e=>{const b=e.target.closest("[data-meal]");if(b)setMeal(b.dataset.meal)});
+/* ---- código de barras: Open Food Facts + plano B (foto da tabela nutricional) ---- */
+let PCODE=null,scanStream=null,scanTimer=null,zx=null;
+function loadZX(){return new Promise((ok,ko)=>{if(window.ZXing)return ok();const s=document.createElement("script");
+  s.src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";s.onload=ok;s.onerror=()=>ko(new Error("zx"));document.head.appendChild(s)})}
+function stopScan(){clearInterval(scanTimer);scanTimer=null;if(zx){try{zx.reset()}catch(e){}zx=null}
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null}$("scanV").srcObject=null}
+async function openScan(){
+  $("scanCode").value="";$("scanMsg").textContent="A abrir a câmara…";$("ovScan").classList.add("on");$("scanBox").hidden=false;
+  const found=code=>{stopScan();$("ovScan").classList.remove("on");lookup(code)};
+  try{
+    if("BarcodeDetector" in window){ // Android/Chrome: detetor nativo
+      const det=new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e"]});
+      scanStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+      const v=$("scanV");v.srcObject=scanStream;await v.play();
+      $("scanMsg").textContent="Aponta a câmara para o código de barras.";
+      scanTimer=setInterval(async()=>{try{const r=await det.detect(v);if(r[0])found(r[0].rawValue)}catch(e){}},250);
+    }else{ // PC/iPhone: biblioteca ZXing
+      await loadZX();zx=new ZXing.BrowserMultiFormatReader();
+      await zx.decodeFromConstraints({video:{facingMode:"environment"}},$("scanV"),(res)=>{if(res)found(res.getText())});
+      $("scanMsg").textContent="Aponta a câmara para o código de barras.";
+    }
+  }catch(e){stopScan();$("scanBox").hidden=true;$("scanMsg").textContent="Não consegui abrir a câmara — escreve o número do código em baixo.";$("scanCode").focus()}
+}
+$("scanX").onclick=()=>{stopScan();$("ovScan").classList.remove("on")};
+$("scanGo").onclick=()=>{const c=$("scanCode").value.replace(/\D/g,"");if(c.length>=8){stopScan();$("ovScan").classList.remove("on");lookup(c)}else $("scanMsg").textContent="O código tem de ter pelo menos 8 números."};
+$("scanCode").onkeydown=e=>{if(e.key==="Enter")$("scanGo").click()};
+function showProd(html){$("prod").innerHTML=html;$("prod").hidden=false;document.querySelector(".photo").hidden=true}
+function fillFood(f,units){
+  pick({n:f.n,k:r1(f.k),p:r1(f.p),c:r1(f.c),f:r1(f.f)});
+  const u=(units||[]).filter(x=>x.g>0);
+  if(u.length){$("fg").value=r0(u[0].g);preview()}
+  return u.length?`<div class="units">${u.map(x=>`<button class="chip" data-g="${x.g}">${esc(x.l)} (${r0(x.g)} g)</button>`).join("")}<button class="chip" data-g="100">100 g</button></div>`:"";
+}
+async function lookup(code){
+  openAdd(mealNow());PCODE=code;
+  const mine=(S.codes||{})[code];
+  if(mine){showProd(`<b>${esc(mine.n)}</b><span class="src">Código ${esc(code)} · guardado nos teus alimentos</span>`+fillFood(mine,mine.units));return}
+  showProd(`<span class="src">A procurar o código ${esc(code)} no Open Food Facts…</span>`);
+  let p=null;
+  try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_pt,brands,nutriments,quantity,product_quantity,serving_size,serving_quantity`);
+    const j=await r.json();if(j.status===1)p=j.product}catch(e){}
+  const n=p&&p.nutriments||{};
+  const kcal=n["energy-kcal_100g"]??(n["energy_100g"]!=null?n["energy_100g"]/4.184:null);
+  if(p&&kcal!=null&&n.proteins_100g!=null&&n.carbohydrates_100g!=null&&n.fat_100g!=null){
+    const name=[p.product_name_pt||p.product_name,p.brands&&p.brands.split(",")[0]].filter(Boolean).join(" · ").slice(0,60)||"Produto "+code;
+    const f={n:name,k:+kcal,p:+n.proteins_100g,c:+n.carbohydrates_100g,f:+n.fat_100g};
+    const units=[];if(+p.serving_quantity>0)units.push({l:"1 porção",g:+p.serving_quantity});if(+p.product_quantity>0)units.push({l:"Embalagem",g:+p.product_quantity});
+    f.units=units;
+    showProd(`<b>${esc(name)}</b><span class="src">Código ${esc(code)} · Open Food Facts${p.quantity?" · "+esc(p.quantity):""}</span>`+fillFood(f,units));
+    $("prod")._f=f;
+  }else{
+    const nm=p&&(p.product_name_pt||p.product_name);
+    if(nm)$("fn").value=nm;
+    showProd(`<b>${nm?esc(nm):"Produto não encontrado"}</b><span class="src">Código ${esc(code)} · ${p?"o Open Food Facts tem o produto mas sem valores nutricionais":"não está no Open Food Facts"}</span>
+      <button class="photobtn" id="labelBtn">📷 Foto da tabela nutricional</button>
+      <span class="src">O Gemini lê os valores por 100 g. Depois fica guardado nos teus alimentos.</span>`);
+  }
+}
+$("prod").addEventListener("click",e=>{
+  const b=e.target.closest("[data-g]");if(b){$("fg").value=r0(+b.dataset.g);preview();return}
+  if(e.target.id==="labelBtn")$("labelIn").click();
+});
+$("labelIn").onchange=async e=>{
+  const file=e.target.files[0];e.target.value="";if(!file)return;
+  if(!GK()){showProd(`<span class="src">Primeiro cola a tua chave Gemini em Mais → Metas e chave da IA.</span>`);return}
+  const old=$("prod").innerHTML;showProd(`<span class="src">A ler a tabela nutricional…</span>`);
+  aiAbort=new AbortController();
+  try{
+    const b64=await imgToB64(file);
+    const P=`Lê a tabela nutricional desta embalagem. Usa a coluna POR 100 g (ou 100 ml). Se só houver por porção, converte para 100 g.
+Lê também o nome do produto e a marca se estiverem visíveis, o tamanho de uma porção e o peso total da embalagem se aparecerem.
+Responde APENAS com JSON: {"name":"...","kcal100":0,"p100":0,"c100":0,"f100":0,"portion_g":0,"package_g":0}`;
+    const a=await askGemini(await modelOrder(),[{text:P},{inline_data:{mime_type:"image/jpeg",data:b64}}],"A ler a tabela…",Date.now()+60000,25000);
+    const j=a.json,name=($("fn").value.trim()||String(j.name||"")||"Produto "+PCODE).slice(0,60);
+    const f={n:name,k:+j.kcal100||0,p:+j.p100||0,c:+j.c100||0,f:+j.f100||0};
+    const units=[];if(+j.portion_g>0)units.push({l:"1 porção",g:+j.portion_g});if(+j.package_g>0)units.push({l:"Embalagem",g:+j.package_g});
+    f.units=units;$("prod")._f=f;
+    showProd(`<b>${esc(name)}</b><span class="src">Código ${esc(PCODE)} · lido da tabela pelo Gemini — confirma os valores</span>`+fillFood(f,units));
+  }catch(err){$("prod").innerHTML=old;$("prod").insertAdjacentHTML("beforeend",`<span class="src">${esc(err.message||"Não consegui ler a tabela.")}</span>`)}
+  $("photoBtn").textContent="📷 Calcular por foto";$("photoBtn").disabled=false;
+};
 /* ---- botão + ---- */
 $("plus").onclick=()=>{$("plMsg").textContent="";$("ovPlus").classList.add("on")};
 $("plX").onclick=()=>$("ovPlus").classList.remove("on");
 $("pPhoto").onclick=()=>{$("ovPlus").classList.remove("on");showTab("diario");openAdd(mealNow());$("photoIn").click()};
+$("pScan").onclick=()=>{$("ovPlus").classList.remove("on");showTab("diario");openScan()};
 $("pSearch").onclick=()=>{$("ovPlus").classList.remove("on");showTab("diario");openAdd(mealNow());$("q").focus()};
 $("pWater").onclick=()=>{D.water=(D.water||0)+250;save("d-"+key(cur),D);render();$("plMsg").textContent=`Água: ${D.water} ml hoje.`};
 $("pCopy").onclick=()=>{
