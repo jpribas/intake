@@ -26,7 +26,37 @@
 *{box-sizing:border-box;min-width:0}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
 h1,h2,.num{font-family:Outfit,Inter,sans-serif}
-.wrap{max-width:640px;margin:0 auto;padding:0 16px 96px}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px calc(110px + env(safe-area-inset-bottom))}
+.tab[hidden]{display:none}
+.ttl{font-size:28px;margin:18px 0 6px}
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:15;background:var(--card);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+.nav .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:center}
+.nav button{border:0;background:transparent;color:var(--mute);display:grid;justify-items:center;gap:2px;font-size:12px;font-weight:600;min-height:52px;padding:4px 0}
+.nav button svg{width:24px;height:24px}
+.nav button.on{color:var(--acc)}
+.nav .plus{width:60px;height:60px;min-height:0;border-radius:50%;background:var(--acc);color:#fff;justify-self:center;margin-top:-26px;box-shadow:0 6px 18px rgb(232 69 44/.35);place-content:center}
+.nav .plus svg{width:30px;height:30px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:6px 0 14px}
+.tile{border:0;border-radius:18px;aspect-ratio:1;display:grid;place-content:center;justify-items:center;gap:6px;font-weight:600;font-size:14px;color:#1d1b18;text-align:center;padding:6px}
+.tile svg{width:30px;height:30px}
+.t1{background:#ffc7b8}.t2{background:#b9e8cc}.t3{background:#a9d6e3}.t4{background:#e2c9f0}
+.rows{border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:10px 16px;border:0;border-bottom:1px solid var(--line);background:var(--card);text-align:left;font-size:16px}
+.row:last-child{border-bottom:0}
+.row .grow{flex:1}.row small{display:block;color:var(--mute);font-size:13px}
+.row .go{color:var(--mute)}
+.mealpick{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 12px}
+.mealpick button{min-height:38px;padding:0 12px;border-radius:19px;border:1px solid var(--line);background:var(--bg);font-size:14px}
+.mealpick button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.stat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}
+.stat div{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center}
+.stat b{display:block;font-family:Outfit;font-size:24px}.stat span{font-size:13px;color:var(--mute)}
+.days{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px 16px;display:grid;gap:10px}
+.day{display:grid;grid-template-columns:52px minmax(0,1fr) 56px;gap:10px;align-items:center;font-size:14px}
+.day .bar{height:12px;position:relative;overflow:visible}
+.day .goal{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.5}
+.day span:last-child{text-align:right;font-family:Outfit;font-weight:600}
+.empty{color:var(--mute);text-align:center;padding:24px 8px}
 .top{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:8px;padding:12px 0;border-bottom:1px solid var(--line)}
 .top h1{flex:1;text-align:center;font-size:22px;margin:0}
 button{font:inherit;color:inherit;cursor:pointer}
@@ -106,12 +136,11 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 </head>
 <body>
 <div class="wrap">
+<section class="tab" id="tab-diario">
   <div class="top">
     <button class="ib" id="prev" aria-label="Dia anterior">‹</button>
     <h1 id="dlabel">Hoje</h1>
     <button class="ib" id="next" aria-label="Dia seguinte">›</button>
-    <button class="ib" id="goals" aria-label="Metas">◎</button>
-    <button class="ib" id="cloud" aria-label="Sincronizar com o Google Drive">☁</button>
   </div>
   <button class="syncbar" id="syncbar" hidden>☁ Toca para sincronizar com o Google Drive</button>
 
@@ -135,12 +164,54 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
 
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
+</section>
+
+<section class="tab" id="tab-resumo" hidden>
+  <h1 class="ttl">Resumo</h1>
+  <div id="resumo"></div>
+</section>
+
+<section class="tab" id="tab-alimentos" hidden>
+  <h1 class="ttl">Alimentos</h1>
+  <p class="small">Os alimentos que já usaste. Toca num para o adicionar ao diário.</p>
+  <input id="fq" placeholder="Procurar nos teus alimentos" autocomplete="off" style="margin:10px 0">
+  <div class="rows" id="foods"></div>
+</section>
+
+<section class="tab" id="tab-mais" hidden>
+  <h1 class="ttl">Mais</h1>
+  <div class="rows">
+    <button class="row" id="goals"><span class="grow">Metas e chave da IA<small>Calorias, macros, água e chave Gemini</small></span><span class="go">›</span></button>
+    <button class="row" id="cloud"><span class="grow">Google Drive<small id="cloudtxt">Sincronizar entre telemóvel e PC</small></span><span class="go">☁</span></button>
+  </div>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 12 · 25/11/2026</p>
+  <p class="note">Intake · versão 13 · 25/11/2026</p>
+</section>
 </div>
+
+<nav class="nav" aria-label="Navegação"><div class="in">
+  <button data-tab="resumo"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="12" width="4" height="9" rx="1"/><rect x="10" y="6" width="4" height="15" rx="1"/><rect x="17" y="9" width="4" height="12" rx="1"/></svg>Resumo</button>
+  <button data-tab="diario" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Diário</button>
+  <button class="plus" id="plus" aria-label="Adicionar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button data-tab="alimentos"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7c-1-2-3-3-5-2.5C4 5.2 3 8 3.6 11c.8 4 3.6 9 6 9 1 0 1.5-.5 2.4-.5s1.4.5 2.4.5c2.4 0 5.2-5 6-9 .6-3-.4-5.8-3.4-6.5-2-.5-4 .5-5 2.5z"/><path d="M12 7c0-2 1-4 3-4.5" stroke="currentColor" stroke-width="1.6" fill="none"/></svg>Alimentos</button>
+  <button data-tab="mais"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>Mais</button>
+</div></nav>
+
+<div class="ov" id="ovPlus"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="plT">
+  <h2 id="plT">Adicionar ao diário</h2>
+  <div class="tiles">
+    <button class="tile t1" id="pPhoto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Foto</button>
+    <button class="tile t2" id="pSearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg>Procurar</button>
+    <button class="tile t3" id="pWater"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></svg>Água +250</button>
+    <button class="tile t4" id="pCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg>Repetir ontem</button>
+  </div>
+  <p class="small" id="plMsg"></p>
+  <div class="acts"><button id="plX">Fechar</button></div>
+</div></div>
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
   <h2 id="addT">Adicionar</h2>
+  <div class="mealpick" id="mealpick"></div>
   <div class="photo">
     <button class="photobtn" id="photoBtn">📷 Calcular por foto</button>
     <input id="photoIn" type="file" accept="image/*" hidden>
@@ -203,7 +274,8 @@ let token=null,tokenExp=0,tc=null,fileId=null,pushT=null,afterToken=null;
 {const t=L.get("gtok");if(t&&t.exp>Date.now()+60000){token=t.t;tokenExp=t.exp}} // sessão guardada (válida ~1 h)
 const connected=()=>localStorage.getItem("cal:gdrive")==="1";
 function setCloud(state,msg){
-  $("cloud").className="ib"+(state==="on"?" on":state==="busy"?" busy":"");
+  $("cloud").classList.toggle("busy",state==="busy");
+  $("cloudtxt").textContent=state==="on"?"Sincronizado ✓":state==="busy"?"A sincronizar…":state==="err"?"Erro — toca para tentar de novo":connected()?"Ligado — toca para sincronizar":"Toca para ligar ao Google Drive";
   if(msg)$("status").textContent=msg;
   $("syncbar").hidden=state!=="err";
 }
@@ -303,7 +375,10 @@ function search(){
 function pick(f){$("fn").value=f.n;F[0].value=f.k;F[1].value=f.p;F[2].value=f.c;F[3].value=f.f;$("fg").focus();preview()}
 function calc(){const g=+$("fg").value||0,m=g/100;const [k,p,c,f]=F.map(x=>+x.value||0);return {g,kcal:k*m,p:p*m,c:c*m,f:f*m,per:{k,p,c,f}}}
 function preview(){const v=calc();$("pv").innerHTML=`<span><b>${r0(v.kcal)}</b>kcal</span><span><b>${r1(v.p)}</b>P</span><span><b>${r1(v.c)}</b>H</span><span><b>${r1(v.f)}</b>G</span>`}
-function openAdd(m){meal=m;$("addT").textContent="Adicionar · "+MEALS.find(x=>x[0]===m)[1];
+function setMeal(m){meal=m;$("addT").textContent="Adicionar · "+MEALS.find(x=>x[0]===m)[1];
+  $("mealpick").innerHTML=MEALS.map(([id,n])=>`<button data-meal="${id}" class="${id===m?"on":""}">${n}</button>`).join("")}
+function mealNow(){const h=new Date().getHours();return h<11?"pa":h<16?"al":h<19?"la":"ja"}
+function openAdd(m){setMeal(m);
   $("q").value="";$("fn").value="";$("fg").value=100;F.forEach(x=>x.value="");$("hint").value="";$("aiOut").innerHTML="";AI=[];search();preview();$("ovAdd").classList.add("on")}
 
 /* ---- foto com IA (Gemini) ---- */
@@ -484,6 +559,48 @@ $("gOk").onclick=()=>{const n=id=>Math.max(1,+$(id).value||1);S.kcal=n("gk");S.p
 document.querySelectorAll(".ov").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("on")}));
 document.addEventListener("keydown",e=>{if(e.key==="Escape")document.querySelectorAll(".ov.on").forEach(o=>o.classList.remove("on"))});
 
+/* ---- separadores ---- */
+let TAB="diario";
+function showTab(t){TAB=t;document.querySelectorAll(".tab").forEach(x=>x.hidden=x.id!=="tab-"+t);
+  document.querySelectorAll(".nav [data-tab]").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+  if(t==="resumo")renderResumo();if(t==="alimentos")renderFoods();window.scrollTo(0,0)}
+document.querySelectorAll(".nav [data-tab]").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+function renderResumo(){
+  const t=new Date();t.setHours(12,0,0,0);
+  const days=[...Array(30)].map((_,i)=>{const d=new Date(t.getTime()-i*864e5),v=L.get("d-"+key(d));return {d,v,T:v?tot(v.entries||[]):null}});
+  const logged=n=>days.slice(0,n).filter(x=>x.T&&x.T.k>0);
+  const avg=(a,f)=>a.length?Math.round(a.reduce((s,x)=>s+f(x),0)/a.length):0;
+  const w=logged(7),m=logged(30),onT=w.filter(x=>Math.abs(x.T.k-S.kcal)<=S.kcal*0.1).length;
+  if(!m.length){$("resumo").innerHTML=`<p class="empty">Ainda não há registos. Adiciona refeições no Diário e o resumo aparece aqui.</p>`;return}
+  const max=Math.max(S.kcal*1.25,...days.slice(0,7).map(x=>x.T?x.T.k:0));
+  $("resumo").innerHTML=`<div class="stat"><div><b>${avg(w,x=>x.T.k)}</b><span>kcal/dia (7 dias)</span></div><div><b>${avg(w,x=>x.T.p)} g</b><span>proteína/dia</span></div><div><b>${onT}/${w.length}</b><span>dias na meta ±10%</span></div></div>
+  <div class="days">`+days.slice(0,7).reverse().map(x=>{const k=x.T?x.T.k:0,c=k>S.kcal*1.1?"#c0392b":k<S.kcal*0.9?"var(--c)":"var(--p)";
+    return `<div class="day"><span>${x.d.toLocaleDateString("pt-PT",{weekday:"short"})}</span><div class="bar"><i style="width:${k/max*100}%;background:${c}"></i><span class="goal" style="left:${S.kcal/max*100}%"></span></div><span>${k?r0(k):"—"}</span></div>`}).join("")+
+  `</div><p class="small">Linha = meta (${S.kcal} kcal). Verde: na meta · azul: abaixo · vermelho: acima. Média de 30 dias: ${avg(m,x=>x.T.k)} kcal (${m.length} dias registados).</p>`;
+}
+function renderFoods(){
+  const t=$("fq").value.trim().toLowerCase(),list=S.foods.filter(f=>!t||f.n.toLowerCase().includes(t));
+  $("foods").innerHTML=list.length?list.map(f=>`<div class="row"><button class="grow" data-food="${esc(f.n)}" style="border:0;background:none;text-align:left;font:inherit;color:inherit;min-height:44px">${esc(f.n)}<small>${r0(f.k)} kcal · P ${r1(f.p)} · H ${r1(f.c)} · G ${r1(f.f)} /100 g</small></button><button class="del" data-fdel="${esc(f.n)}" aria-label="Apagar ${esc(f.n)}">✕</button></div>`).join("")
+    :`<p class="empty">${S.foods.length?"Nada encontrado.":"Ainda não tens alimentos guardados. Os que adicionares (à mão ou por foto) aparecem aqui."}</p>`;
+}
+$("fq").oninput=renderFoods;
+$("foods").addEventListener("click",e=>{
+  const a=e.target.closest("[data-food]");if(a){const f=S.foods.find(x=>x.n===a.dataset.food);if(f){openAdd(mealNow());pick(f)}return}
+  const d=e.target.closest("[data-fdel]");if(d){S.foods=S.foods.filter(x=>x.n!==d.dataset.fdel);save("settings",S);renderFoods()}
+});
+$("mealpick").addEventListener("click",e=>{const b=e.target.closest("[data-meal]");if(b)setMeal(b.dataset.meal)});
+/* ---- botão + ---- */
+$("plus").onclick=()=>{$("plMsg").textContent="";$("ovPlus").classList.add("on")};
+$("plX").onclick=()=>$("ovPlus").classList.remove("on");
+$("pPhoto").onclick=()=>{$("ovPlus").classList.remove("on");showTab("diario");openAdd(mealNow());$("photoIn").click()};
+$("pSearch").onclick=()=>{$("ovPlus").classList.remove("on");showTab("diario");openAdd(mealNow());$("q").focus()};
+$("pWater").onclick=()=>{D.water=(D.water||0)+250;save("d-"+key(cur),D);render();$("plMsg").textContent=`Água: ${D.water} ml hoje.`};
+$("pCopy").onclick=()=>{
+  const y=L.get("d-"+key(new Date(cur.getTime()-864e5)));
+  if(!y||!(y.entries||[]).length){$("plMsg").textContent="Não há nada registado no dia anterior.";return}
+  D.entries.push(...y.entries.map(e=>({...e,id:Date.now().toString(36)+Math.random().toString(36).slice(2,6)})));
+  save("d-"+key(cur),D);render();$("plMsg").textContent=`Copiei ${y.entries.length} alimentos do dia anterior.`;
+};
 S={...DEF,...(L.get("settings")||{})};
 $("status").textContent=connected()?"":"Dados guardados neste dispositivo. Toca em ☁ para ligar ao Google Drive.";
 loadDay();
