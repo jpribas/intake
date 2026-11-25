@@ -250,7 +250,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
     <button class="row" id="cloud"><span class="grow">Google Drive<small id="cloudtxt">Sincronizar entre telemóvel e PC</small></span><span class="go">☁</span></button>
   </div>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 18 · 25/11/2026</p>
+  <p class="note">Intake · versão 19 · 25/11/2026</p>
 </section>
 </div>
 
@@ -662,7 +662,7 @@ function addOk(){
   D.entries.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),meal,name,g:v.g,kcal:r1(v.kcal),p:r1(v.p),c:r1(v.c),f:r1(v.f)});
   save("d-"+key(cur),D);
   const nf={n:name,...v.per};S.foods=[nf,...S.foods.filter(f=>f.n.toLowerCase()!==name.toLowerCase())].slice(0,150);
-  if(PCODE){S.codes=S.codes||{};const pf=$("prod")._f;S.codes[PCODE]={...nf,units:pf&&pf.units||[]};PCODE=null}
+  if(PCODE){S.codes=S.codes||{};const pf=$("prod")._f;S.codes[PCODE]={...nf,units:(pf&&pf.units||S.codes[PCODE]&&S.codes[PCODE].units||[]),last:v.g};PCODE=null}
   save("settings",S);
   $("ovAdd").classList.remove("on");render();
 }
@@ -814,6 +814,12 @@ async function openScan(){
 $("scanX").onclick=()=>{stopScan();$("ovScan").classList.remove("on")};
 $("scanGo").onclick=()=>{const c=$("scanCode").value.replace(/\D/g,"");if(c.length>=8){stopScan();$("ovScan").classList.remove("on");lookup(c)}else $("scanMsg").textContent="O código tem de ter pelo menos 8 números."};
 $("scanCode").onkeydown=e=>{if(e.key==="Enter")$("scanGo").click()};
+function parseQty(q){ // "160 g", "4 x 125 g", "1 L", "500ml" → {each, total} em g/ml
+  const t=String(q||"").toLowerCase().replace(",",".");
+  const m=t.match(/(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(kg|g|gr|ml|cl|l)\b/)||t.match(/()(\d+(?:\.\d+)?)\s*(kg|g|gr|ml|cl|l)\b/);if(!m)return null; // "6 x 125 g" tem prioridade
+  const f={kg:1000,g:1,gr:1,ml:1,cl:10,l:1000}[m[3]],each=+m[2]*f,n=m[1]?+m[1]:1;
+  return each>0?{each,total:each*n,n}:null;
+}
 function showProd(html){$("prod").innerHTML=html;$("prod").hidden=false;document.querySelector(".photo").hidden=true}
 function fillFood(f,units){
   pick({n:f.n,k:r1(f.k),p:r1(f.p),c:r1(f.c),f:r1(f.f)});
@@ -824,7 +830,8 @@ function fillFood(f,units){
 async function lookup(code){
   openAdd(mealNow());PCODE=code;
   const mine=(S.codes||{})[code];
-  if(mine){showProd(`<b>${esc(mine.n)}</b><span class="src">Código ${esc(code)} · guardado nos teus alimentos</span>`+fillFood(mine,mine.units));return}
+  if(mine){const u=(mine.units||[]).slice();if(mine.last>0)u.unshift({l:"Como da última vez",g:mine.last});
+    showProd(`<b>${esc(mine.n)}</b><span class="src">Código ${esc(code)} · guardado nos teus alimentos</span>`+fillFood(mine,u.filter((x,i,a)=>a.findIndex(y=>y.g===x.g)===i)));return}
   showProd(`<span class="src">A procurar o código ${esc(code)} no Open Food Facts…</span>`);
   let p=null;
   try{const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=product_name,product_name_pt,brands,nutriments,quantity,product_quantity,serving_size,serving_quantity`);
@@ -834,7 +841,12 @@ async function lookup(code){
   if(p&&kcal!=null&&n.proteins_100g!=null&&n.carbohydrates_100g!=null&&n.fat_100g!=null){
     const name=[p.product_name_pt||p.product_name,p.brands&&p.brands.split(",")[0]].filter(Boolean).join(" · ").slice(0,60)||"Produto "+code;
     const f={n:name,k:+kcal,p:+n.proteins_100g,c:+n.carbohydrates_100g,f:+n.fat_100g};
-    const units=[];if(+p.serving_quantity>0)units.push({l:"1 porção",g:+p.serving_quantity});if(+p.product_quantity>0)units.push({l:"Embalagem",g:+p.product_quantity});
+    const units=[],pq=parseQty(p.quantity);
+    if(pq&&pq.n>1)units.push({l:"1 unidade",g:pq.each});                 // pack: 4 x 125 g → 1 iogurte
+    else if(pq&&pq.total<=300&&!(+p.product_quantity>300))units.push({l:"Embalagem",g:pq.total}); // embalagem individual (iogurte 160 g)
+    if(+p.serving_quantity>0&&!units.some(u=>u.g===+p.serving_quantity))units.push({l:"1 porção",g:+p.serving_quantity});
+    const tot=+p.product_quantity>0?+p.product_quantity:pq?pq.total:0;
+    if(tot>0&&!units.some(u=>u.g===tot))units.push({l:"Embalagem",g:tot});
     f.units=units;
     showProd(`<b>${esc(name)}</b><span class="src">Código ${esc(code)} · Open Food Facts${p.quantity?" · "+esc(p.quantity):""}</span>`+fillFood(f,units));
     $("prod")._f=f;
