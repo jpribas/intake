@@ -136,7 +136,7 @@ input{width:100%;font:16px Inter,sans-serif;color:var(--ink);background:var(--bg
   <div id="meals"></div>
   <p class="note" id="status">A carregar…</p>
   <p class="note">Valores da lista base são aproximados (por 100 g).</p>
-  <p class="note">Intake · versão 10 · 25/11/2026</p>
+  <p class="note">Intake · versão 11 · 25/11/2026</p>
 </div>
 
 <div class="ov" id="ovAdd"><div class="sh" role="dialog" aria-modal="true" aria-labelledby="addT">
@@ -328,63 +328,99 @@ async function pickModels(){ // escolhe automaticamente os modelos "flash" dispo
   localStorage.setItem("cal:gmodels",JSON.stringify(ok));return ok;
 }
 function imgToB64(file){return new Promise((ok,ko)=>{const img=new Image(),u=URL.createObjectURL(file);
-  img.onload=()=>{const M=1024,s=Math.min(1,M/Math.max(img.width,img.height)),c=document.createElement("canvas");
+  img.onload=()=>{const M=1536,s=Math.min(1,M/Math.max(img.width,img.height)),c=document.createElement("canvas"); // 1536 px: alimentos pequenos mais nítidos
     c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
-    URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",0.82).split(",")[1])};
+    URL.revokeObjectURL(u);ok(c.toDataURL("image/jpeg",0.85).split(",")[1])};
   img.onerror=()=>ko(new Error("Não foi possível ler a imagem."));img.src=u})}
 let SIZE="médio";
-const PROMPT=hint=>`És um nutricionista experiente a analisar a foto de uma refeição para um diário alimentar.
+const norm=t=>String(t).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\(.*?\)/g,"").replace(/\s+/g," ").trim();
+/* aprender com as correções: guarda, por alimento, quanto costumas corrigir as gramas da IA (sincroniza com o Drive) */
+function corrText(){
+  const c=Object.values(S.corr||{}).filter(x=>Math.abs(x.r-1)>=0.1).sort((a,b)=>b.n-a.n).slice(0,15);
+  if(!c.length)return "";
+  return `\nCORREÇÕES ANTERIORES DESTE UTILIZADOR (aplica-as quando o alimento aparecer — são as porções reais dele):\n`+
+    c.map(x=>`- ${x.name}: ${x.r>1?"subestimas":"sobrestimas"}; ele corrige em média para ${Math.round(x.r*100)}% do que estimas (${x.n}×)`).join("\n")+"\n";
+}
+function learn(items){
+  S.corr=S.corr||{};
+  for(const x of items){if(!(x.g0>0)||!(x.g>0))continue;
+    const k=norm(x.n),ratio=Math.min(3,Math.max(0.3,x.g/x.g0)),o=S.corr[k]||{name:x.n,r:1,n:0};
+    S.corr[k]={name:x.n,r:Math.round(((o.r*o.n+ratio)/(o.n+1))*100)/100,n:Math.min(o.n+1,20)};}
+  const keys=Object.keys(S.corr);if(keys.length>60)keys.sort((a,b)=>S.corr[a].n-S.corr[b].n).slice(0,keys.length-60).forEach(k=>delete S.corr[k]);
+}
+const RULES=hint=>`És um nutricionista experiente a analisar a foto de uma refeição para um diário alimentar.
 
 1. PRODUTOS DE MARCA: se reconheceres um produto de marca ou de cadeia de restaurantes (ex.: Big Mac, McChicken, batatas fritas McDonald's, Whopper, pastel de nata, Compal, Coca-Cola, iogurte Danone), usa o nome comercial e os valores nutricionais OFICIAIS da versão europeia/portuguesa, como um só item (não separes pão, carne, molho…).
-2. NÃO DEIXES NADA DE FORA: inclui todos os alimentos visíveis, mesmo pequenos (enchidos, sementes, frutos secos, queijo ralado), molhos e temperos visíveis, e o óleo/azeite usado a cozinhar quando a comida é frita, salteada ou brilhante (estima-o como item à parte, ex.: "Azeite (cozinhado)").
-3. QUANTIDADES: o utilizador diz que o prato é ${SIZE}. Para cada item, CONTA as peças visíveis (fatias, pedaços, colheradas) e multiplica pelo peso típico de cada peça; para itens a granel (arroz, massa, puré) estima pela área e altura que ocupam no prato (ex.: meia tigela média ≈ 200 g de arroz). Escreve essa conta no campo "how" (ex.: "14 fatias × 11 g", "ocupa ~1/3 da tigela, ~4 cm de altura"). Na dúvida, prefere porções normais de restaurante — não subestimes. Se houver duas variedades do mesmo alimento (ex.: arroz branco e arroz frito), lista-as em separado.
-4. VALORES: dá kcal, proteína, hidratos e gordura POR 100 g, com valores de tabelas de composição (preferir a tabela portuguesa INSA), para o alimento já cozinhado como aparece.
-5. CONFIANÇA: para cada item indica "alta", "media" ou "baixa" — baixa quando não tens a certeza do que é ou da quantidade.
-${hint?`6. Informação do utilizador (tem prioridade sobre o que vês): "${hint}".`:""}
-
+2. NÃO DEIXES NADA DE FORA: inclui todos os alimentos visíveis, mesmo pequenos ou parcialmente escondidos (enchidos, sementes, frutos secos, queijo ralado), molhos e temperos visíveis, e o óleo/azeite usado a cozinhar quando a comida é frita, salteada ou brilhante (como item à parte, ex.: "Azeite (cozinhado)").
+3. ESCALA: usa objetos de referência que apareçam para medir: garfo ≈ 19 cm, faca ≈ 22 cm, colher de sopa ≈ 17 cm, palma da mão adulta ≈ 9 cm de largura, lata 33 cl ≈ 12 cm de altura, prato raso normal ≈ 26 cm, tigela normal ≈ 15 cm. Se não houver referência, o utilizador diz que o prato é ${SIZE}.
+4. QUANTIDADES: para cada item, CONTA as peças visíveis (fatias, pedaços, colheradas) e multiplica pelo peso típico de cada peça; para itens a granel (arroz, massa, puré) estima pela área e altura que ocupam (ex.: meia tigela média ≈ 200 g de arroz). Escreve essa conta no campo "how" (ex.: "14 fatias × 11 g", "ocupa ~1/3 da tigela, ~4 cm de altura"). Na dúvida, prefere porções normais de restaurante — não subestimes. Se houver duas variedades do mesmo alimento (ex.: arroz branco e arroz frito), lista-as em separado.
+5. VALORES: dá kcal, proteína, hidratos e gordura POR 100 g, com valores de tabelas de composição (preferir a tabela portuguesa INSA), para o alimento já cozinhado como aparece.
+6. CONFIANÇA: para cada item indica "alta", "media" ou "baixa" — baixa quando não tens a certeza do que é ou da quantidade.
+${corrText()}${hint?`\nINFORMAÇÃO DO UTILIZADOR (tem prioridade sobre o que vês): "${hint}".\n`:""}
 Nomes em português de Portugal, curtos. Responde APENAS com JSON, sem texto extra:
 {"items":[{"name":"...","how":"...","grams":0,"kcal100":0,"p100":0,"c100":0,"f100":0,"conf":"alta"}]}
 Se não houver comida na foto responde {"items":[]}.`;
+const REVIEW=(hint,first)=>RULES(hint)+`
+
+REVISÃO: esta foi a tua primeira análise desta foto:
+${JSON.stringify(first)}
+Olha outra vez para a foto com atenção, zona a zona (centro, bordas, por baixo de outros alimentos):
+a) há alimentos, molhos ou gorduras que faltem? acrescenta-os;
+b) algum alimento está mal identificado? corrige o nome e os valores;
+c) as contas das gramas fazem sentido com o tamanho real? corrige-as.
+Devolve a lista COMPLETA e corrigida, no mesmo formato JSON.`;
 let lastFile=null,retryT=null;
+async function askGemini(order,parts,label,deadline,perReq){ // tenta os modelos por ordem; devolve {json,model} ou lança erro
+  const btn=$("photoBtn"),body=JSON.stringify({contents:[{parts}],generationConfig:{responseMimeType:"application/json"}});
+  let lastErr="";
+  for(let i=0;i<order.length;i++){
+    const m=order[i];
+    if(aiAbort.signal.aborted)throw new Error("Cancelado.");
+    if(Date.now()>deadline)break;
+    btn.textContent=i?`A tentar outro modelo (${i+1}/${order.length})…`:label;
+    const ac=new AbortController(),to=setTimeout(()=>ac.abort(),Math.min(perReq,deadline-Date.now()));
+    const stop=()=>ac.abort();aiAbort.signal.addEventListener("abort",stop);
+    let r;
+    try{r=await fetch(GB+"models/"+m+":generateContent",{method:"POST",headers:{"x-goog-api-key":GK(),"Content-Type":"application/json"},body,signal:ac.signal})}
+    catch(e){clearTimeout(to);aiAbort.signal.removeEventListener("abort",stop);if(aiAbort.signal.aborted)throw new Error("Cancelado.");lastErr=e.name==="AbortError"?"O Gemini demorou demasiado — tenta outra vez.":"Sem ligação à internet.";continue}
+    clearTimeout(to);aiAbort.signal.removeEventListener("abort",stop);
+    if(r.ok){const res=await r.json();
+      const txt=(res.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/^```(json)?|```$/g,"").trim();
+      try{return {json:JSON.parse(txt),model:m}}catch(e){lastErr="Resposta inválida da IA.";continue}}
+    if(r.status===400||r.status===403)throw new Error("Chave inválida ou sem acesso.");
+    if(r.status===429){lastErr="Limite gratuito atingido — tenta daqui a um minuto.";continue}
+    if(r.status===404){lastErr="Modelo indisponível.";localStorage.removeItem("cal:gmodels");continue}
+    lastErr="O Gemini está muito ocupado agora — tenta daqui a uns minutos.";
+  }
+  throw new Error(lastErr||"O Gemini está muito ocupado agora — tenta daqui a uns minutos.");
+}
+const cleanConf=c=>{const v=String(c).normalize("NFD").replace(/[̀-ͯ]/g,"");return ["alta","media","baixa"].includes(v)?v:"media"};
+const toItems=j=>(j.items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),how:String(x.how||"").slice(0,80),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,cf:cleanConf(x.conf),on:true}));
 async function analyse(file){
   lastFile=file;clearInterval(retryT);
   if(!GK()){$("aiOut").innerHTML=`<p class="small">Primeiro cola a tua chave Gemini em ◎ Metas.</p>`;return}
   const btn=$("photoBtn");btn.disabled=true;btn.textContent="A analisar a foto…";$("aiOut").innerHTML="";
+  aiAbort=new AbortController();$("aiStop").hidden=false;
   try{
-    const b64=await imgToB64(file);
+    const b64=await imgToB64(file),img={inline_data:{mime_type:"image/jpeg",data:b64}},hint=$("hint").value.trim();
     let models=JSON.parse(localStorage.getItem("cal:gmodels")||"null")||await pickModels();
-    const good=localStorage.getItem("cal:gmodel");if(good&&models.includes(good)&&!/lite/.test(good))models=[good,...models.filter(x=>x!==good)]; // o que funcionou da última vez vai primeiro
-    const body=JSON.stringify({contents:[{parts:[{text:PROMPT($("hint").value.trim())},{inline_data:{mime_type:"image/jpeg",data:b64}}]}],generationConfig:{responseMimeType:"application/json"}});
-    let res=null,lastErr="";
-    // ordem: o que funcionou antes → depois alterna normal/lite (os "lite" costumam estar menos ocupados) → máx. 5 modelos, 60 s no total
-    // ordem: modelos normais primeiro (melhor qualidade); os "lite" só como reserva; máx. 5 modelos, 60 s no total
+    const good=localStorage.getItem("cal:gmodel");if(good&&models.includes(good)&&!/lite/.test(good))models=[good,...models.filter(x=>x!==good)];
+    // modelos normais primeiro (melhor qualidade); os "lite" só como reserva; máx. 5 modelos
     const full=models.filter(x=>!/lite/.test(x)),lite=models.filter(x=>/lite/.test(x));
-    const good0=/lite/.test(models[0])?[]:[models[0]];
-    const order=[...new Set([...good0,...full.slice(0,3),...lite.slice(0,2)])].slice(0,5);
-    const deadline=Date.now()+60000;
-    aiAbort=new AbortController();$("aiStop").hidden=false;
-    for(let i=0;i<order.length;i++){
-      const m=order[i];
-      if(aiAbort.signal.aborted){lastErr="Cancelado.";break}
-      if(Date.now()>deadline){lastErr="O Gemini está muito ocupado agora — tenta daqui a uns minutos.";break}
-      btn.textContent=i?`A tentar outro modelo (${i+1}/${order.length})…`:"A analisar a foto…";
-      const ac=new AbortController(),to=setTimeout(()=>ac.abort(),Math.min(20000,deadline-Date.now()));
-      const stop=()=>ac.abort();aiAbort.signal.addEventListener("abort",stop);
-      let r;
-      try{r=await fetch(GB+"models/"+m+":generateContent",{method:"POST",headers:{"x-goog-api-key":GK(),"Content-Type":"application/json"},body,signal:ac.signal})}
-      catch(e){clearTimeout(to);aiAbort.signal.removeEventListener("abort",stop);lastErr=aiAbort.signal.aborted?"Cancelado.":e.name==="AbortError"?"O Gemini demorou demasiado — tenta outra vez.":"Sem ligação à internet.";continue}
-      clearTimeout(to);aiAbort.signal.removeEventListener("abort",stop);
-      if(r.ok){res=await r.json();localStorage.setItem("cal:gmodel",m);break}
-      if(r.status===400||r.status===403){lastErr="Chave inválida ou sem acesso.";break}
-      if(r.status===429){lastErr="Limite gratuito atingido — tenta daqui a um minuto.";continue}
-      if(r.status===404){lastErr="Modelo indisponível.";localStorage.removeItem("cal:gmodels");continue}
-      lastErr="O Gemini está muito ocupado agora — tenta daqui a uns minutos.";
+    const order=[...new Set([...(/lite/.test(models[0])?[]:[models[0]]),...full.slice(0,3),...lite.slice(0,2)])].slice(0,5);
+    // 1.ª passagem
+    const a=await askGemini(order,[{text:RULES(hint)},img],"A analisar a foto…",Date.now()+70000,25000);
+    localStorage.setItem("cal:gmodel",a.model);
+    let items=toItems(a.json),model=a.model,reviewed=false;
+    // 2.ª passagem: revisão com o mesmo modelo (se falhar, fica a 1.ª análise)
+    if(items.length){
+      try{const b=await askGemini([a.model],[{text:REVIEW(hint,a.json)},img],"A rever a análise…",Date.now()+30000,30000);
+        const rev=toItems(b.json);
+        if(rev.length){const before=new Set(items.map(x=>norm(x.n)));rev.forEach(x=>{x.added=!before.has(norm(x.n))});items=rev;reviewed=true}
+      }catch(e){if(e.message==="Cancelado.")throw e}
     }
-    $("aiStop").hidden=true;
-    if(!res)throw new Error(lastErr);
-    const txt=(res.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").replace(/^```(json)?|```$/g,"").trim();
-    const items=(JSON.parse(txt).items||[]).map(x=>({n:String(x.name||"Alimento").slice(0,60),how:String(x.how||"").slice(0,80),g:Math.max(0,+x.grams||0),k:+x.kcal100||0,p:+x.p100||0,c:+x.c100||0,f:+x.f100||0,cf:["alta","media","baixa"].includes(String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""))?String(x.conf).normalize("NFD").replace(/[\u0300-\u036f]/g,""):"media",on:true}));
-    AI=items;AIM=localStorage.getItem("cal:gmodel")||"";renderAI();
+    items.forEach(x=>x.g0=x.g); // gramas originais da IA, para aprender com as tuas correções
+    AI=items;AIM=model+(reviewed?" · revisto":"");renderAI();
   }catch(e){
     const msg=e.message||"Erro a analisar.";
     const canRetry=!/Chave|Cancelado|chave Gemini/.test(msg);
@@ -401,7 +437,7 @@ function renderAI(){
   if(!AI.length){$("aiOut").innerHTML=`<p class="small">Não encontrei comida na foto. Tenta outra ou adiciona à mão.</p>`;return}
   $("aiOut").innerHTML=`<div class="ai"><p class="small">Confirma as quantidades (a IA erra mais nas gramas):</p>`+AI.map((x,i)=>`<div class="air${x.cf==="baixa"?" low":""}">
     <input type="checkbox" data-ai-on="${i}" ${x.on?"checked":""} aria-label="Incluir ${esc(x.n)}">
-    <div class="nm">${esc(x.n)}<span class="cf ${x.cf}">${x.cf==="alta"?"certeza alta":x.cf==="baixa"?"verifica":"média"}</span><small>${x.how?esc(x.how)+" · ":""}${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
+    <div class="nm">${esc(x.n)}${x.added?`<span class="cf alta">novo na revisão</span>`:""}<span class="cf ${x.cf}">${x.cf==="alta"?"certeza alta":x.cf==="baixa"?"verifica":"média"}</span><small>${x.how?esc(x.how)+" · ":""}${r0(x.k)} kcal · P ${r1(x.p)} · H ${r1(x.c)} · G ${r1(x.f)} /100 g</small></div>
     <input type="number" inputmode="decimal" data-ai-g="${i}" value="${r0(x.g)}" aria-label="Gramas de ${esc(x.n)}">
     <span class="kk" id="aik${i}">${r0(x.k*x.g/100)}</span></div>`).join("")+
     `<div class="aitot" id="aitot"></div><p class="small">Analisado por ${esc(AIM)}${/lite/.test(AIM)?" (modelo leve — confirma bem as gramas)":""}</p><div class="acts"><button class="pri" id="aiAdd">Adicionar selecionados</button></div></div>`;
@@ -414,6 +450,7 @@ function aiAdd(){
   for(const x of sel){const m=x.g/100;
     D.entries.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),meal,name:x.n,g:x.g,kcal:r1(x.k*m),p:r1(x.p*m),c:r1(x.c*m),f:r1(x.f*m)});
     S.foods=[{n:x.n,k:x.k,p:x.p,c:x.c,f:x.f},...S.foods.filter(f=>f.n.toLowerCase()!==x.n.toLowerCase())].slice(0,150);}
+  learn(sel);
   save("d-"+key(cur),D);save("settings",S);
   $("ovAdd").classList.remove("on");render();
 }
